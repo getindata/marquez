@@ -20,7 +20,8 @@ export const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: 'Karla',
+    fontFamily:
+      '"Suisse Intl", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
     h1: {
       fontSize: '2.5rem',
       fontWeight: 600,
@@ -34,7 +35,8 @@ export const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#71ddbf',
+      // Axis by Xebia: Xebia magenta replaces stock teal
+      main: '#E331D0',
     },
     error: {
       main: '#ee7b7b',
@@ -66,6 +68,9 @@ export const THEME_EXTRA = {
     disabled: '#8d9499',
   },
 }
+
+// the Axis night band of the header
+export const AXIS_NIGHT = '#150027'
 
 // 1px for bottom border
 export const HEADER_HEIGHT = 64 + 1

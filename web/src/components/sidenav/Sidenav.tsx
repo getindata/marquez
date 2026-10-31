@@ -7,7 +7,8 @@ import SVG from 'react-inlinesvg'
 import { Link, useLocation } from 'react-router-dom'
 import Box from '@mui/material/Box'
 
-import { DRAWER_WIDTH, HEADER_HEIGHT } from '../../helpers/theme'
+import { AXIS_NIGHT, DRAWER_WIDTH, HEADER_HEIGHT } from '../../helpers/theme'
+import { AxisSymbol } from '../header/AxisSymbol'
 import { Divider, Drawer, createTheme } from '@mui/material'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCogs, faDatabase } from '@fortawesome/free-solid-svg-icons'
@@ -21,7 +22,6 @@ import { useTheme } from '@emotion/react'
 
 import { Dashboard } from '@mui/icons-material'
 import iconSearchArrow from '../../img/iconSearchArrow.svg'
-import marquez_logo from './marquez-icon-white-solid.svg'
 
 interface SidenavProps {}
 
@@ -71,9 +71,11 @@ const Sidenav: React.FC<SidenavProps> = () => {
             alignItems={'center'}
             justifyContent={'center'}
             height={HEADER_HEIGHT}
+            width={'100%'}
+            sx={{ backgroundColor: AXIS_NIGHT, borderBottom: '1px solid #34274a' }}
           >
-            <Link to='/'>
-              <img src={marquez_logo} height={40} alt='Marquez Logo' />
+            <Link to='/' aria-label='Axis lineage home' style={{ display: 'flex' }}>
+              <AxisSymbol size={32} />
             </Link>
           </Box>
           <Divider sx={{ my: 1 }} />
