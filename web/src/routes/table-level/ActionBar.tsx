@@ -1,13 +1,13 @@
-import { ArrowBackIosRounded, Refresh } from '@mui/icons-material'
-import { Divider, FormControlLabel, Switch, TextField } from '@mui/material'
-import { HEADER_HEIGHT, theme } from '../../helpers/theme'
+import { AXIS } from '../../layers'
+import { ArrowBackIosRounded } from '@mui/icons-material'
+import { FormControlLabel, Switch } from '@mui/material'
+import { HEADER_HEIGHT } from '../../helpers/theme'
 import { fetchLineage } from '../../store/actionCreators'
 import { truncateText } from '../../helpers/text'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
-import MqText from '../../components/core/text/MqText'
 import React from 'react'
 
 interface ActionBarProps {
@@ -19,129 +19,212 @@ interface ActionBarProps {
   setIsCompact: (isCompact: boolean) => void
   isFull: boolean
   setIsFull: (isFull: boolean) => void
+  /** Hidden when the namespace has no layer catalog. */
+  showLayers?: boolean
+  activeLayerCount?: number
+  layersOpen?: boolean
+  onToggleLayers?: () => void
+}
+
+/** The stacked-squares icon of the Layers button. */
+const LayersIcon = () => (
+  <svg
+    width={15}
+    height={15}
+    viewBox='0 0 16 16'
+    fill='none'
+    stroke='currentColor'
+    strokeWidth={1.3}
+    strokeLinejoin='round'
+    aria-hidden='true'
+  >
+    <path d='M8 1.5 14.5 5 8 8.5 1.5 5z' />
+    <path d='M1.5 8 8 11.5 14.5 8' />
+    <path d='M1.5 11 8 14.5 14.5 11' />
+  </svg>
+)
+
+const squareButton = {
+  width: 24,
+  height: 24,
+  border: `1px solid ${AXIS.line}`,
+  borderRadius: '4px',
+  background: 'none',
+  color: AXIS.text,
+  cursor: 'pointer',
+  font: 'inherit',
+  padding: 0,
 }
 
 export const ActionBar = ({
   nodeType,
-  fetchLineage,
   depth,
   setDepth,
   isCompact,
   setIsCompact,
   isFull,
   setIsFull,
+  showLayers = false,
+  activeLayerCount = 0,
+  layersOpen = false,
+  onToggleLayers,
 }: ActionBarProps) => {
   const { namespace, name } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  const changeDepth = (next: number) => {
+    const value = Math.max(0, next)
+    setDepth(value)
+    searchParams.set('depth', String(value))
+    setSearchParams(searchParams)
+  }
+
+  const switchLabel = (text: string) => (
+    <Box component='span' sx={{ color: AXIS.muted, fontSize: 13 }}>
+      {text}
+    </Box>
+  )
+
   return (
     <Box
-      sx={{
-        borderBottomWidth: 2,
-        borderTopWidth: 0,
-        borderLeftWidth: 0,
-        borderRightWidth: 0,
-        borderStyle: 'dashed',
-      }}
       display={'flex'}
       height={HEADER_HEIGHT - 1}
-      justifyContent={'space-between'}
       alignItems={'center'}
-      px={2}
-      borderColor={theme.palette.secondary.main}
+      gap={'18px'}
+      px={'18px'}
+      sx={{
+        background: AXIS.actionBar,
+        borderBottom: `1px solid ${AXIS.line}`,
+        color: AXIS.text,
+        fontFamily: AXIS.font,
+        fontSize: 13,
+      }}
     >
-      <Box display={'flex'} alignItems={'center'}>
+      <Box display={'flex'} alignItems={'center'} minWidth={0}>
         <MQTooltip title={`Back to ${nodeType === 'JOB' ? 'jobs' : 'datasets'}`}>
           <IconButton
             size={'small'}
-            sx={{ mr: 2 }}
+            sx={{ mr: 1, color: AXIS.muted }}
             onClick={() => navigate(nodeType === 'JOB' ? '/' : '/datasets')}
           >
             <ArrowBackIosRounded fontSize={'small'} />
           </IconButton>
         </MQTooltip>
-        <MqText heading>{nodeType === 'JOB' ? 'Jobs' : 'Datasets'}</MqText>
-        <Divider orientation='vertical' flexItem sx={{ mx: 2 }} />
-        <Box>
-          <MqText subdued>Mode</MqText>
-          <MqText font={'mono'}>Table Level</MqText>
-        </Box>
-        <Divider orientation='vertical' flexItem sx={{ mx: 2 }} />
-        <Box>
-          <MqText subdued>Namespace</MqText>
-          <MqText font={'mono'}>
-            {namespace ? truncateText(namespace, 40) : 'Unknown namespace name'}
-          </MqText>
-        </Box>
-        <Divider orientation='vertical' flexItem sx={{ mx: 2 }} />
-        <Box>
-          <MqText subdued>Name</MqText>
-          <MqText font={'mono'}>{name ? truncateText(name, 40) : 'Unknown dataset name'}</MqText>
+        <Box component='span' sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+          {nodeType === 'JOB' ? 'Jobs' : 'Datasets'}
+          <Box
+            component='span'
+            sx={{ fontFamily: AXIS.mono, fontWeight: 400, color: AXIS.muted, ml: '6px' }}
+          >
+            {namespace ? truncateText(namespace, 40) : 'unknown namespace'} /{' '}
+            {name ? truncateText(name, 60) : 'unknown name'}
+          </Box>
         </Box>
       </Box>
-      <Box display={'flex'} alignItems={'center'}>
-        <MQTooltip title={'Refresh'}>
-          <IconButton
-            sx={{ mr: 2 }}
-            color={'primary'}
-            size={'small'}
-            onClick={() => {
-              if (namespace && name) {
-                fetchLineage(nodeType, namespace, name, depth)
-              }
+      <Box flex={1} />
+      {showLayers && (
+        <button
+          type='button'
+          aria-pressed={layersOpen}
+          aria-label='Layers'
+          onClick={onToggleLayers}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            border: `1px solid ${layersOpen ? AXIS.magenta : AXIS.line}`,
+            boxShadow: layersOpen ? `0 0 0 1px ${AXIS.magenta}` : 'none',
+            borderRadius: 6,
+            padding: '5px 11px',
+            color: AXIS.text,
+            background: 'none',
+            font: 'inherit',
+            cursor: 'pointer',
+          }}
+        >
+          <LayersIcon />
+          Layers
+          <i
+            data-testid='layers-count'
+            style={{
+              fontStyle: 'normal',
+              fontSize: 11,
+              background: AXIS.velvet,
+              borderRadius: 9,
+              padding: '0 6px',
+              minWidth: 18,
+              textAlign: 'center',
             }}
           >
-            <Refresh fontSize={'small'} />
-          </IconButton>
-        </MQTooltip>
-        <TextField
+            {activeLayerCount}
+          </i>
+        </button>
+      )}
+      <Box display={'flex'} alignItems={'center'} gap={'6px'} sx={{ color: AXIS.muted }}>
+        Depth
+        <button
+          type='button'
+          aria-label='Decrease depth'
+          style={squareButton}
+          onClick={() => changeDepth(depth - 1)}
+        >
+          −
+        </button>
+        <Box
+          component='b'
           id='column-level-depth'
-          type='number'
-          inputProps={{ min: 0 }}
-          label='Depth'
-          variant='outlined'
-          size='small'
-          sx={{ width: '80px', mr: 2 }}
-          value={depth}
-          onChange={(e) => {
-            setDepth(isNaN(parseInt(e.target.value)) ? 0 : parseInt(e.target.value))
-            searchParams.set('depth', e.target.value)
-            setSearchParams(searchParams)
+          sx={{
+            minWidth: 28,
+            textAlign: 'center',
+            border: `1px solid ${AXIS.line}`,
+            borderRadius: '4px',
+            p: '2px 6px',
+            color: AXIS.text,
+            fontWeight: 500,
           }}
-        />
-        <Box display={'flex'} flexDirection={'column'}>
-          <FormControlLabel
-            control={
-              <Switch
-                size={'small'}
-                value={isFull}
-                defaultChecked={searchParams.get('isFull') === 'true'}
-                onChange={(_, checked) => {
-                  setIsFull(checked)
-                  searchParams.set('isFull', checked.toString())
-                  setSearchParams(searchParams)
-                }}
-              />
-            }
-            label={<MqText font={'mono'}>Full Graph</MqText>}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                size={'small'}
-                value={isCompact}
-                defaultChecked={searchParams.get('isCompact') === 'true'}
-                onChange={(_, checked) => {
-                  setIsCompact(checked)
-                  searchParams.set('isCompact', checked.toString())
-                  setSearchParams(searchParams)
-                }}
-              />
-            }
-            label={<MqText font={'mono'}>Compact Nodes</MqText>}
-          />
+        >
+          {depth}
         </Box>
+        <button
+          type='button'
+          aria-label='Increase depth'
+          style={squareButton}
+          onClick={() => changeDepth(depth + 1)}
+        >
+          +
+        </button>
       </Box>
+      <FormControlLabel
+        sx={{ m: 0, gap: '4px' }}
+        control={
+          <Switch
+            size={'small'}
+            checked={isFull}
+            onChange={(_, checked) => {
+              setIsFull(checked)
+              searchParams.set('isFull', checked.toString())
+              setSearchParams(searchParams)
+            }}
+          />
+        }
+        label={switchLabel('Full graph')}
+      />
+      <FormControlLabel
+        sx={{ m: 0, gap: '4px' }}
+        control={
+          <Switch
+            size={'small'}
+            checked={isCompact}
+            onChange={(_, checked) => {
+              setIsCompact(checked)
+              searchParams.set('isCompact', checked.toString())
+              setSearchParams(searchParams)
+            }}
+          />
+        }
+        label={switchLabel('Compact nodes')}
+      />
     </Box>
   )
 }

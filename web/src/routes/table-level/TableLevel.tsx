@@ -1,4 +1,15 @@
 import * as Redux from 'redux'
+import {
+  AXIS,
+  LayerNodeKind,
+  LayerView,
+  LayersPanel,
+  activeLayersFromParams,
+  layersForGraph,
+  toggleLayer,
+  useLayerCatalog,
+  withActiveLayers,
+} from '../../layers'
 import { ActionBar } from './ActionBar'
 import { Box } from '@mui/system'
 import { DEFAULT_MAX_SCALE, Graph, ZoomPanControls } from '../../../libs/graph'
@@ -7,16 +18,16 @@ import { HEADER_HEIGHT, theme } from '../../helpers/theme'
 import { IState } from '../../store/reducers'
 import { JobOrDataset } from '../../types/lineage'
 import { LineageGraph } from '../../types/api'
+import { TABLE_LEVEL_LAYOUT_OPTIONS, createElkNodes } from './layout'
 import { TableLevelNodeData, tableLevelNodeRenderer } from './nodes'
 import { ZoomControls } from '../column-level/ZoomControls'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
-import { createElkNodes } from './layout'
 import { fetchLineage } from '../../store/actionCreators'
 import { useCallbackRef } from '../../helpers/hooks'
 import { useParams, useSearchParams } from 'react-router-dom'
 import ParentSize from '@visx/responsive/lib/components/ParentSize'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TableLevelDrawer from './TableLevelDrawer'
 
 interface StateProps {
@@ -43,16 +54,47 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
 
   const [isCompact, setIsCompact] = useState(searchParams.get('isCompact') === 'true')
   const [isFull, setIsFull] = useState(searchParams.get('isFull') === 'true')
+  const [layersOpen, setLayersOpen] = useState(false)
 
   const graphControls = useRef<ZoomPanControls>()
 
   const collapsedNodes = searchParams.get('collapsedNodes')
+
+  // Axis lineage layers: the namespace's catalog, and the active layers kept in `layers=`.
+  const catalog = useLayerCatalog(namespace)
+  const layersParam = searchParams.get('layers')
+  const layerView: LayerView = useMemo(
+    () => ({ catalog, active: activeLayersFromParams(searchParams, catalog) }),
+    [catalog, layersParam]
+  )
+  const closeLayers = useCallback(() => setLayersOpen(false), [])
 
   useEffect(() => {
     if (name && namespace && nodeType) {
       fetchLineage(nodeType as JobOrDataset, namespace, name, depth)
     }
   }, [name, namespace, depth])
+
+  const setGraphControls = useCallbackRef((zoomControls) => {
+    graphControls.current = zoomControls
+  })
+
+  const { nodes, edges } = lineage
+    ? createElkNodes(
+        lineage,
+        `${nodeType}:${namespace}:${name}`,
+        isCompact,
+        isFull,
+        collapsedNodes,
+        layerView
+      )
+    : { nodes: [], edges: [] }
+
+  useEffect(() => {
+    setTimeout(() => {
+      graphControls.current?.fitContent()
+    }, 300)
+  }, [nodes.length, isCompact])
 
   if (!lineage) {
     return <div />
@@ -73,23 +115,16 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
     )
   }
 
-  const setGraphControls = useCallbackRef((zoomControls) => {
-    graphControls.current = zoomControls
-  })
-
-  const { nodes, edges } = createElkNodes(
-    lineage,
-    `${nodeType}:${namespace}:${name}`,
-    isCompact,
-    isFull,
-    collapsedNodes
+  const graphKinds = new Set<LayerNodeKind>(
+    nodes.map((n) => (n.kind === 'JOB' ? 'job' : 'dataset') as LayerNodeKind)
   )
+  const panelLayers = layersForGraph(catalog, graphKinds)
+  const activeCount = panelLayers.filter((l) => layerView.active.has(l.id)).length
 
-  useEffect(() => {
-    setTimeout(() => {
-      graphControls.current?.fitContent()
-    }, 300)
-  }, [nodes.length, isCompact])
+  const handleToggleLayer = (id: string) => {
+    if (!catalog) return
+    setSearchParams(withActiveLayers(searchParams, toggleLayer(layerView.active, id), catalog))
+  }
 
   return (
     <>
@@ -102,12 +137,23 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
         setIsCompact={setIsCompact}
         isFull={isFull}
         setIsFull={setIsFull}
+        showLayers={panelLayers.length > 0}
+        activeLayerCount={activeCount}
+        layersOpen={layersOpen}
+        onToggleLayers={() => setLayersOpen((open) => !open)}
       />
-      <Box height={`calc(100vh - ${HEADER_HEIGHT}px - ${HEADER_HEIGHT}px - 1px)`}>
+      <Box
+        height={`calc(100vh - ${HEADER_HEIGHT}px - ${HEADER_HEIGHT}px - 1px)`}
+        position='relative'
+        sx={{ background: AXIS.canvas }}
+      >
         <Drawer
           anchor={'right'}
           open={!!searchParams.get('tableLevelNode')}
-          onClose={() => setSearchParams({})}
+          onClose={() => {
+            searchParams.delete('tableLevelNode')
+            setSearchParams(searchParams)
+          }}
           PaperProps={{
             sx: {
               backgroundColor: theme.palette.background.default,
@@ -126,16 +172,26 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
           handleScaleZoom={handleScaleZoom}
           handleResetZoom={handleResetZoom}
         />
+        {layersOpen && panelLayers.length > 0 && (
+          <LayersPanel
+            layers={panelLayers}
+            active={layerView.active}
+            onToggle={handleToggleLayer}
+            onClose={closeLayers}
+          />
+        )}
         <ParentSize>
           {(parent) => (
             <Graph<JobOrDataset, TableLevelNodeData>
               id='column-level-graph'
-              backgroundColor={theme.palette.background.default}
+              backgroundColor={AXIS.canvas}
+              dotGridColor={AXIS.dotGrid}
               height={parent.height}
               width={parent.width}
               nodes={nodes}
               edges={edges}
               direction='right'
+              layoutOptions={TABLE_LEVEL_LAYOUT_OPTIONS}
               nodeRenderers={tableLevelNodeRenderer}
               setZoomPanControls={setGraphControls}
             />

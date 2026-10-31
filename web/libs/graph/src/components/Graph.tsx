@@ -33,6 +33,8 @@ interface Props<K, D> {
   dotGridColor?: string
   disableZoomPan?: boolean
   setZoomPanControls?: (controls: ZoomPanControls) => void
+  // ELK layout options merged over the library's defaults
+  layoutOptions?: Record<string, string>
 }
 
 export const Graph = <K, D>({
@@ -54,6 +56,7 @@ export const Graph = <K, D>({
   disableZoomPan = false,
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   setZoomPanControls = () => {},
+  layoutOptions,
 }: Props<K, D>) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, containerHeight] = useSize(containerRef)
@@ -65,6 +68,7 @@ export const Graph = <K, D>({
     direction: direction ?? 'right',
     keepPreviousGraph: true,
     webWorkerUrl,
+    layoutOptions,
     getLayoutOptions: (node: Node<K, D>) =>
       nodeRenderers.get(node.kind)?.getLayoutOptions(node) || node,
   })

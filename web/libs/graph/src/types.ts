@@ -18,6 +18,10 @@ export interface Edge {
   type?: string
   color?: string
   strokeWidth?: number
+  // dash pattern of the base line (round caps when set), e.g. '0.1 5' for a dotted line
+  strokeDasharray?: string
+  // width of the marching-dots overlay; defaults to strokeWidth, else 5
+  animatedStrokeWidth?: number
   isAnimated?: boolean
   sourceNodeId: string
   targetNodeId: string

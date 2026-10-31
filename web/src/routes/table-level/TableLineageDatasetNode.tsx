@@ -1,27 +1,40 @@
+import { AXIS, SELECTED_RING, mix } from '../../layers'
 import { ChevronLeft } from '@mui/icons-material'
-import { Dataset, LineageGraph } from '../../types/api'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  DATASET_HEADER_HEIGHT,
+  FIELD_ROW_HEIGHT,
+  MAX_FIELD_ROWS,
+  METER_ROW_HEIGHT,
+  MORE_ROW_HEIGHT,
+} from './sizes'
+import { Dataset } from '../../types/api'
+import { Divider } from '@mui/material'
+import {
+  FillAccent,
+  FillChip,
+  MeterRow,
+  NodeFrame,
+  TooltipLine,
+  ellipsis,
+  nodeUrl,
+} from './cardParts'
 import { IState } from '../../store/reducers'
 import { LineageDataset } from '../../types/lineage'
 import { PositionedNode } from '../../../libs/graph'
-import { THEME_EXTRA, theme } from '../../helpers/theme'
 import { TableLineageDatasetNodeData } from './nodes'
 import { connect } from 'react-redux'
+import { datasetFields } from './layout'
 
 import * as Redux from 'redux'
-import { Divider } from '@mui/material'
 import { bindActionCreators } from 'redux'
 import { datasetFacetsQualityAssertions, datasetFacetsStatus } from '../../helpers/nodes'
-import { faDatabase } from '@fortawesome/free-solid-svg-icons/faDatabase'
 import { fetchDataset, resetDataset } from '../../store/actionCreators'
 import { formatUpdatedAt } from '../../helpers'
-import { truncateText, truncateTextFront } from '../../helpers/text'
+import { truncateTextFront } from '../../helpers/text'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import Box from '@mui/system/Box'
 import IconButton from '@mui/material/IconButton'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
 import MqStatus from '../../components/core/status/MqStatus'
-import MqText from '../../components/core/text/MqText'
 import React from 'react'
 
 interface DispatchProps {
@@ -30,208 +43,294 @@ interface DispatchProps {
 }
 
 interface StateProps {
-  lineage: LineageGraph
-  dataset: Dataset
+  dataset?: Dataset
 }
 
 interface TableLineageDatasetNodeProps {
   node: PositionedNode<'DATASET', TableLineageDatasetNodeData>
+  isMiniMap?: boolean
 }
 
-const ICON_SIZE = 12
-const COMPACT_HEIGHT = 24
+/** `table`, `view`… from the standard `datasetType` facet, else from Marquez's dataset type. */
+export const datasetTypeOf = (dataset: LineageDataset) => {
+  const facet = (dataset.facets as Record<string, any> | undefined)?.datasetType
+  const given = typeof facet?.datasetType === 'string' ? facet.datasetType : ''
+  if (given) return given.toLowerCase().replace(/_/g, ' ')
+  return dataset.type === 'STREAM' ? 'stream' : 'table'
+}
 
-const TableLineageDatasetNode = ({
+export const TableLineageDatasetNode = ({
   node,
+  isMiniMap,
   dataset,
   fetchDataset,
-  resetDataset,
-}: TableLineageDatasetNodeProps & StateProps & DispatchProps) => {
-  const isCompact = node.height === COMPACT_HEIGHT
-
+}: TableLineageDatasetNodeProps & StateProps & Partial<DispatchProps>) => {
   const navigate = useNavigate()
   const { name, namespace } = useParams()
-  const isSelected = name === node.data.dataset.name && namespace === node.data.dataset.namespace
   const [searchParams, setSearchParams] = useSearchParams()
+  const lineageDataset = node.data.dataset
+  const { marks, showFields } = node.data
+  const isSelected = name === lineageDataset.name && namespace === lineageDataset.namespace
   const isCollapsed = searchParams.get('collapsedNodes')?.split(',').includes(node.id)
+  const wave = marks.fill
+
+  if (isMiniMap) {
+    return (
+      <rect
+        width={node.width}
+        height={node.height}
+        rx={8}
+        fill={wave ? wave.color : AXIS.cardHeader}
+      />
+    )
+  }
 
   const handleClick = () => {
     navigate(
-      `/lineage/dataset/${encodeURIComponent(node.data.dataset.namespace)}/${encodeURIComponent(
-        node.data.dataset.name
-      )}?tableLevelNode=${encodeURIComponent(node.id)}`
+      nodeUrl('dataset', lineageDataset.namespace, lineageDataset.name, node.id, searchParams)
     )
   }
 
-  const addToToolTip = (lineageDataset: LineageDataset, dataset: Dataset) => {
-    return (
-      <foreignObject>
-        <Box>
-          <Box display={'flex'} justifyContent={'space-between'}>
-            <MqText block bold sx={{ mr: 6 }}>
-              Namespace:
-            </MqText>
-            <MqText block font={'mono'}>
-              {truncateTextFront(lineageDataset.namespace, 40)}
-            </MqText>
-          </Box>
-          <Box display={'flex'} justifyContent={'space-between'}>
-            <MqText block bold sx={{ mr: 6 }}>
-              Name:
-            </MqText>
-            <MqText block font={'mono'}>
-              {truncateTextFront(lineageDataset.name, 40)}
-            </MqText>
-          </Box>
-          {lineageDataset.description && (
-            <Box display={'flex'} justifyContent={'space-between'}>
-              <MqText block bold sx={{ mr: 6 }}>
-                Description:
-              </MqText>
-              <MqText block font={'mono'}>
-                {lineageDataset.description}
-              </MqText>
-            </Box>
-          )}
-          <Box display={'flex'} justifyContent={'space-between'}>
-            <MqText block bold sx={{ mr: 6 }}>
-              Updated at:
-            </MqText>
-            <MqText block font={'mono'}>
-              {formatUpdatedAt(lineageDataset.updatedAt)}
-            </MqText>
-          </Box>
-          {dataset && datasetFacetsStatus(dataset.facets) && (
-            <>
-              <Divider sx={{ my: 1 }} />
-              <Box display={'flex'} justifyContent={'space-between'}>
-                <MqText block bold sx={{ mr: 6 }}>
-                  Quality:
-                </MqText>
-                <MqStatus
-                  label={
-                    datasetFacetsQualityAssertions(dataset.facets).find((a) => !a.success)
-                      ? 'UNHEALTHY'
-                      : 'HEALTHY'
-                  }
-                  color={datasetFacetsStatus(dataset.facets)}
-                />
-              </Box>
-            </>
-          )}
-        </Box>
-      </foreignObject>
-    )
+  const toggleCollapsed = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    const collapsed = (searchParams.get('collapsedNodes') || '').split(',').filter(Boolean)
+    const next = collapsed.includes(node.id)
+      ? collapsed.filter((id) => id !== node.id)
+      : [...collapsed, node.id]
+    searchParams.set('collapsedNodes', next.toString())
+    setSearchParams(searchParams)
   }
+
+  const tooltip = (
+    <div>
+      <TooltipLine label='Namespace:'>
+        {truncateTextFront(lineageDataset.namespace, 40)}
+      </TooltipLine>
+      <TooltipLine label='Name:'>{truncateTextFront(lineageDataset.name, 40)}</TooltipLine>
+      {lineageDataset.description && (
+        <TooltipLine label='Description:'>{lineageDataset.description}</TooltipLine>
+      )}
+      <TooltipLine label='Updated at:'>{formatUpdatedAt(lineageDataset.updatedAt)}</TooltipLine>
+      {wave && <TooltipLine label='Layer:'>{wave.tooltip}</TooltipLine>}
+      {marks.markers.map((m) => (
+        <TooltipLine key={m.layerId} label='Flag:'>
+          {m.tooltip}
+        </TooltipLine>
+      ))}
+      {dataset && datasetFacetsStatus(dataset.facets) && (
+        <>
+          <Divider sx={{ my: 1 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+            <b>Quality:</b>
+            <MqStatus
+              label={
+                datasetFacetsQualityAssertions(dataset.facets).find((a) => !a.success)
+                  ? 'UNHEALTHY'
+                  : 'HEALTHY'
+              }
+              color={datasetFacetsStatus(dataset.facets)}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  )
+
+  const fields = datasetFields(lineageDataset)
+  const shownFields = showFields ? fields.slice(0, MAX_FIELD_ROWS) : []
+  const moreFields = showFields ? fields.length - shownFields.length : 0
+  const rowLine = `1px solid ${AXIS.rowLine}`
 
   return (
     <g>
-      <Box
-        component={'rect'}
-        sx={{
-          x: 0,
-          y: 0,
-          width: node.width,
-          height: node.height,
-          filter: isSelected ? `drop-shadow( 0 0 4px ${theme.palette.primary.main})` : 'none',
-          rx: 4,
-          fill: theme.palette.background.paper,
-          cursor: 'pointer',
-          transition: 'all 0.3',
-        }}
-        cursor={'pointer'}
-        onClick={handleClick}
-      />
-      <Box
-        component={'rect'}
-        x={0}
-        y={0}
-        height={24}
-        width={24}
-        sx={{ rx: 4, fill: theme.palette.info.main }}
-      />
-
-      <FontAwesomeIcon
-        aria-hidden={'true'}
-        title={'Job'}
-        icon={faDatabase}
-        width={ICON_SIZE}
-        height={ICON_SIZE}
-        x={6}
-        y={ICON_SIZE / 2}
-        color={theme.palette.common.white}
-        onClick={handleClick}
-      />
-      <foreignObject width={16} height={24} x={node.width - 18} y={0}>
-        <MQTooltip title={isCollapsed ? 'Expand' : 'Collapse'} placement={'top'}>
-          <IconButton
-            sx={{ width: 10, height: 10 }}
-            onClick={(event) => {
-              event.stopPropagation()
-              const collapsedNodes = searchParams.get('collapsedNodes')
-              if (collapsedNodes) {
-                const collapsedNodesArray = collapsedNodes.split(',')
-                if (collapsedNodesArray.includes(node.id)) {
-                  collapsedNodesArray.splice(collapsedNodesArray.indexOf(node.id), 1)
-                } else {
-                  collapsedNodesArray.push(node.id)
-                }
-                searchParams.set('collapsedNodes', collapsedNodesArray.toString())
-              } else {
-                searchParams.set('collapsedNodes', node.id)
-              }
-              setSearchParams(searchParams)
+      <NodeFrame width={node.width} height={node.height}>
+        <div
+          data-testid='dataset-card'
+          data-selected={isSelected ? 'true' : 'false'}
+          onClick={handleClick}
+          style={{
+            position: 'relative',
+            width: node.width,
+            height: node.height,
+            boxSizing: 'border-box',
+            border: `1px solid ${wave ? wave.color : AXIS.line}`,
+            borderRadius: 8,
+            background: AXIS.card,
+            boxShadow: isSelected ? SELECTED_RING : '0 6px 18px rgba(0,0,0,.35)',
+            color: AXIS.text,
+            fontFamily: AXIS.font,
+            fontSize: 13,
+            lineHeight: 1.35,
+            overflow: 'hidden',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              height: DATASET_HEADER_HEIGHT,
+              boxSizing: 'border-box',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 10px 6px 12px',
+              background: wave ? mix(wave.color, AXIS.cardHeader, 0.22) : AXIS.cardHeader,
+              borderBottom: showFields || marks.meter ? `1px solid ${AXIS.line}` : 'none',
             }}
           >
-            <ChevronLeft
-              sx={{
-                width: 10,
-                height: 10,
-                rotate: !isCollapsed ? '-90deg' : 0,
-                transition: 'rotate .3s',
+            {wave && <FillAccent color={wave.color} radius='8px 0 0 0' />}
+            {marks.dot && (
+              <MQTooltip title={marks.dot.tooltip} placement='top'>
+                <span
+                  data-testid='heat-dot'
+                  style={{
+                    width: 12,
+                    height: 12,
+                    flex: 'none',
+                    borderRadius: '50%',
+                    background: marks.dot.color,
+                  }}
+                />
+              </MQTooltip>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <MQTooltip
+                onOpen={() => fetchDataset?.(lineageDataset.namespace, lineageDataset.name)}
+                placement='right-start'
+                title={tooltip}
+              >
+                <div
+                  style={{
+                    ...ellipsis,
+                    fontFamily: AXIS.mono,
+                    fontWeight: 600,
+                    fontSize: 12,
+                    paddingRight: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <span style={ellipsis}>{lineageDataset.name}</span>
+                  {marks.markers.map((m) => (
+                    <span
+                      key={m.layerId}
+                      data-testid='flag-marker'
+                      style={{
+                        flex: 'none',
+                        width: 7,
+                        height: 7,
+                        transform: 'rotate(45deg)',
+                        background: AXIS.magenta,
+                      }}
+                    />
+                  ))}
+                </div>
+              </MQTooltip>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: AXIS.muted,
+                  fontSize: 10.5,
+                  minWidth: 0,
+                }}
+              >
+                <span style={ellipsis}>
+                  {lineageDataset.namespace} · {datasetTypeOf(lineageDataset)}
+                </span>
+                {wave && <FillChip fill={wave} />}
+              </div>
+            </div>
+            <MQTooltip title={isCollapsed ? 'Expand' : 'Collapse'} placement='top'>
+              <IconButton
+                aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                onClick={toggleCollapsed}
+                sx={{
+                  position: 'absolute',
+                  top: 3,
+                  right: 3,
+                  width: 14,
+                  height: 14,
+                  p: 0,
+                  color: AXIS.muted,
+                  opacity: 0.6,
+                  '&:hover': { opacity: 1 },
+                }}
+              >
+                <ChevronLeft
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    rotate: !isCollapsed ? '-90deg' : 0,
+                    transition: 'rotate .3s',
+                  }}
+                />
+              </IconButton>
+            </MQTooltip>
+          </div>
+          {marks.meter && (
+            <MeterRow
+              meter={marks.meter}
+              style={{
+                height: METER_ROW_HEIGHT,
+                padding: '0 10px 0 12px',
+                background: AXIS.meterRow,
+                borderBottom: shownFields.length ? rowLine : 'none',
               }}
             />
-          </IconButton>
-        </MQTooltip>
-      </foreignObject>
-      <MQTooltip
-        onOpen={() => fetchDataset(node.data.dataset.namespace, node.data.dataset.name)}
-        onClose={() => resetDataset}
-        placement={'right-start'}
-        title={addToToolTip(node.data.dataset, dataset)}
-      >
-        <g>
-          <text
-            fontSize='8'
-            fontFamily={`${'Source Code Pro'}, mono`}
-            fill={'white'}
-            x={28}
-            y={10}
-            onClick={handleClick}
-            cursor={'pointer'}
-          >
-            DATASET
-          </text>
-          <text fontSize='8' fill={'white'} x={28} y={20} cursor={'pointer'} onClick={handleClick}>
-            {truncateText(node.data.dataset.name, 15)}
-          </text>
-        </g>
-      </MQTooltip>
-
-      {!isCompact &&
-        node.data.dataset.fields.map((field, index) => {
-          return (
-            <text
+          )}
+          {shownFields.map((field, index) => (
+            <div
               key={field.name}
-              fontSize='8'
-              fill={THEME_EXTRA.typography.subdued}
-              x={10}
-              y={14 + 10 + 10 * (index + 1)}
+              data-testid='field-row'
+              style={{
+                height: FIELD_ROW_HEIGHT,
+                boxSizing: 'border-box',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                padding: '0 10px 0 12px',
+                fontSize: 11,
+                borderTop: index > 0 ? rowLine : 'none',
+              }}
             >
-              - {truncateText(field.name, 20)}
-            </text>
-          )
-        })}
+              <span style={ellipsis}>{field.name}</span>
+              {field.type && (
+                <i
+                  style={{
+                    ...ellipsis,
+                    fontStyle: 'normal',
+                    color: AXIS.muted,
+                    fontFamily: AXIS.mono,
+                    fontSize: 10,
+                  }}
+                >
+                  {field.type.toLowerCase()}
+                </i>
+              )}
+            </div>
+          ))}
+          {moreFields > 0 && (
+            <div
+              data-testid='more-fields'
+              style={{
+                height: MORE_ROW_HEIGHT,
+                boxSizing: 'border-box',
+                textAlign: 'center',
+                color: AXIS.muted,
+                fontSize: 10,
+                lineHeight: `${MORE_ROW_HEIGHT - 1}px`,
+                borderTop: rowLine,
+              }}
+            >
+              + {moreFields} more field{moreFields === 1 ? '' : 's'}
+            </div>
+          )}
+        </div>
+      </NodeFrame>
     </g>
   )
 }
@@ -241,7 +340,6 @@ TableLineageDatasetNode.getLayoutOptions = (node: TableLineageDatasetNodeProps['
 })
 
 const mapStateToProps = (state: IState) => ({
-  lineage: state.lineage.lineage,
   dataset: state.dataset.result,
 })
 
