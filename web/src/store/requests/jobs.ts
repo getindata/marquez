@@ -44,10 +44,49 @@ export const fetchAllJobs = async (
   }
 }
 
+/** How long a read of a namespace's visible jobs serves further pages and counts. */
+const SNAPSHOT_TTL_MS = 30_000
+
+interface Snapshot {
+  at: number
+  jobs: Promise<Job[]>
+}
+const snapshots = new Map<string, Snapshot>()
+
+/**
+ * The visible jobs of a namespace (or of all), from one full read that further pages reuse
+ * for 30 s after it completes; a read in flight is shared, a failed one forgotten.
+ */
+const visibleJobs = (namespace: Nullable<string>, lastRunStates?: RunState): Promise<Job[]> => {
+  const key = `${namespace ?? ''}\u0000${lastRunStates ?? ''}`
+  const cached = snapshots.get(key)
+  if (cached && (cached.at === Infinity || Date.now() - cached.at < SNAPSHOT_TTL_MS)) {
+    return cached.jobs
+  }
+  const snapshot: Snapshot = { at: Infinity, jobs: Promise.resolve([]) } // Infinity: in flight
+  snapshot.jobs = fetchAllJobs(namespace, lastRunStates).then(
+    (jobs) => {
+      snapshot.at = Date.now()
+      return jobs.filter((j) => !isHiddenJob(j))
+    },
+    (error) => {
+      if (snapshots.get(key) === snapshot) snapshots.delete(key)
+      throw error
+    }
+  )
+  snapshots.set(key, snapshot)
+  return snapshot.jobs
+}
+
+/** Forget the jobs read for paging: after a job changes, and in tests. */
+export const resetJobSnapshots = () => {
+  snapshots.clear()
+}
+
 /**
  * A page of the jobs the UI shows, and their count: each table's or view's own job and the
  * `axis.layers` catalog job are left out (layers/hiddenJobs.ts), as on the lineage graph. The
- * API cannot filter by facets, so this reads every job and pages here.
+ * API cannot filter by facets, so the web reads every job once and pages from that read.
  */
 export const getJobs = async (
   namespace: Nullable<string>,
@@ -55,7 +94,7 @@ export const getJobs = async (
   offset = 0,
   lastRunStates?: RunState
 ) => {
-  const visible = (await fetchAllJobs(namespace, lastRunStates)).filter((j) => !isHiddenJob(j))
+  const visible = await visibleJobs(namespace, lastRunStates)
   return { totalCount: visible.length, jobs: visible.slice(offset, offset + limit) }
 }
 
@@ -95,6 +134,7 @@ export const deleteJob = async (namespace: string, jobName: string) => {
   const encodedNamespace = encodeURIComponent(namespace)
   const encodedJob = encodeURIComponent(jobName)
   const url = `${API_URL}/namespaces/${encodedNamespace}/jobs/${encodedJob}`
+  resetJobSnapshots()
   return genericFetchWrapper(url, { method: 'DELETE' }, 'deleteJob')
 }
 

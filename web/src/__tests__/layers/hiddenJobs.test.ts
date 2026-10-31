@@ -3,7 +3,12 @@
 
 import * as requestUtils from '../../store/requests'
 import { IntervalMetric } from '../../store/requests/intervalMetrics'
-import { getJobs, hiddenJobIndex, resetHiddenJobIndex } from '../../store/requests/jobs'
+import {
+  getJobs,
+  hiddenJobIndex,
+  resetHiddenJobIndex,
+  resetJobSnapshots,
+} from '../../store/requests/jobs'
 import { getSearch } from '../../store/requests/search'
 import { isHiddenJob } from '../../layers/hiddenJobs'
 import { withoutHiddenJobs as metricsWithoutHidden } from '../../store/requests/intervalMetrics'
@@ -79,6 +84,7 @@ describe('job lists and counts without hidden jobs', () => {
   let spy: jest.SpyInstance
   beforeEach(() => {
     resetHiddenJobIndex()
+    resetJobSnapshots()
     spy = jest.spyOn(requestUtils, 'genericFetchWrapper')
   })
   afterEach(() => spy.mockRestore())
@@ -91,6 +97,46 @@ describe('job lists and counts without hidden jobs', () => {
     const second = await getJobs('oracle', 2, 2)
     expect(second.jobs.map((j) => j.name)).toEqual(['s.dbt'])
     expect(spy.mock.calls[0][0]).toContain('/namespaces/oracle/jobs?limit=1000&offset=0')
+  })
+
+  it('pages from one read: the next page does not scan the namespace again', async () => {
+    spy.mockImplementation((url: string) => serveJobs(url))
+    await getJobs('oracle', 2, 0)
+    await getJobs('oracle', 2, 2)
+    await getJobs('oracle', 2, 0)
+    expect(spy).toHaveBeenCalledTimes(1)
+    await getJobs('other', 2, 0) // another namespace is another read
+    expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('shares a read in flight and forgets a failed one', async () => {
+    let fail = true
+    spy.mockImplementation((url: string) =>
+      fail ? Promise.reject(new Error('down')) : serveJobs(url)
+    )
+    await expect(Promise.all([getJobs('oracle', 2, 0), getJobs('oracle', 2, 2)])).rejects.toThrow(
+      'down'
+    )
+    expect(spy).toHaveBeenCalledTimes(1)
+    fail = false
+    expect((await getJobs('oracle', 2, 0)).totalCount).toBe(3)
+  })
+
+  it('reads again once the read is 30 s old', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] })
+    try {
+      jest.setSystemTime(new Date('2026-10-31T12:00:00Z'))
+      spy.mockImplementation((url: string) => serveJobs(url))
+      await getJobs('oracle', 2, 0)
+      jest.setSystemTime(new Date('2026-10-31T12:00:29Z'))
+      await getJobs('oracle', 2, 2)
+      expect(spy).toHaveBeenCalledTimes(1)
+      jest.setSystemTime(new Date('2026-10-31T12:00:31Z'))
+      await getJobs('oracle', 2, 0)
+      expect(spy).toHaveBeenCalledTimes(2)
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('reads every page when there are more jobs than one page holds', async () => {
