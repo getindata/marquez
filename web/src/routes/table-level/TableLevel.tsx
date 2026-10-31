@@ -1,8 +1,8 @@
 import * as Redux from 'redux'
 import { ActionBar } from './ActionBar'
 import { Box } from '@mui/system'
-import { DEFAULT_MAX_SCALE, Graph, ZoomPanControls } from '../../../libs/graph'
 import { Drawer } from '@mui/material'
+import { Graph, ZoomPanControls } from '../../../libs/graph'
 import { HEADER_HEIGHT } from '../../helpers/theme'
 import { IState } from '../../store/reducers'
 import { JobOrDataset } from '../../types/lineage'
@@ -17,10 +17,12 @@ import {
   withActiveLayers,
 } from '../../layers'
 import { LineageGraph } from '../../types/api'
+import { MiniMapPlacement } from '../../../libs/graph/src/components/ZoomPanSvg/MiniMap'
 import { TABLE_LEVEL_LAYOUT_OPTIONS, createElkNodes } from './layout'
 import { TableLevelNodeData, tableLevelNodeRenderer } from './nodes'
-import { ZoomControls } from '../column-level/ZoomControls'
+import { TableZoomControls } from './TableZoomControls'
 import { bindActionCreators } from 'redux'
+import { collapsedLineage } from './collapse'
 import { connect } from 'react-redux'
 import { fetchLineage } from '../../store/actionCreators'
 import { useAxisTokens } from '../../theme'
@@ -43,6 +45,21 @@ type ColumnLevelProps = StateProps & DispatchProps
 /** The strip on the right that holds the stock zoom controls (40px wide, 8px margins). */
 const ZOOM_GUTTER = 56
 
+/** The scale a card's name is still legible at: the graph opens no smaller than this. */
+const READABLE_SCALE = 0.6
+
+/** The minimap, when shown: a twelfth of the graph area, in the bottom right corner. */
+const MINIMAP_SCALE = 1 / 12
+const MINIMAP_KEY = 'axis.lineage.minimap'
+
+const readMapOpen = () => {
+  try {
+    return window.localStorage.getItem(MINIMAP_KEY) === 'open'
+  } catch {
+    return false
+  }
+}
+
 const zoomInFactor = 1.5
 const zoomOutFactor = 1 / zoomInFactor
 
@@ -59,6 +76,16 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
   const [isCompact, setIsCompact] = useState(searchParams.get('isCompact') === 'true')
   const [isFull, setIsFull] = useState(searchParams.get('isFull') === 'true')
   const [layersOpen, setLayersOpen] = useState(false)
+  const [mapOpen, setMapOpen] = useState(readMapOpen)
+  const toggleMap = () =>
+    setMapOpen((open) => {
+      try {
+        window.localStorage.setItem(MINIMAP_KEY, open ? 'closed' : 'open')
+      } catch {
+        // storage blocked: the choice lasts for this page only
+      }
+      return !open
+    })
 
   const graphControls = useRef<ZoomPanControls>()
 
@@ -75,7 +102,8 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
 
   useEffect(() => {
     if (name && namespace && nodeType) {
-      fetchLineage(nodeType as JobOrDataset, namespace, name, depth)
+      // one hop more than shown: depth is then cut on the collapsed graph (collapse.ts)
+      fetchLineage(nodeType as JobOrDataset, namespace, name, depth + 1)
     }
   }, [name, namespace, depth])
 
@@ -83,23 +111,18 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
     graphControls.current = zoomControls
   })
 
-  const { nodes, edges } = lineage
-    ? createElkNodes(
-        lineage,
-        `${nodeType}:${namespace}:${name}`,
-        isCompact,
-        isFull,
-        collapsedNodes,
-        layerView,
-        { highlight: t.accent, muted: t.edge }
-      )
-    : { nodes: [], edges: [] }
+  // each table's or view's own job is hidden, its inputs drawn straight into the dataset
+  const view = lineage
+    ? collapsedLineage(lineage, `${nodeType}:${namespace}:${name}`, depth)
+    : undefined
+  const selectedId = view?.selected ?? `${nodeType}:${namespace}:${name}`
 
-  useEffect(() => {
-    setTimeout(() => {
-      graphControls.current?.fitContent()
-    }, 300)
-  }, [nodes.length, isCompact])
+  const { nodes, edges } = view
+    ? createElkNodes(view.graph, selectedId, isCompact, isFull, collapsedNodes, layerView, {
+        highlight: t.accent,
+        muted: t.edge,
+      })
+    : { nodes: [], edges: [] }
 
   if (!lineage) {
     return <div />
@@ -109,15 +132,12 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
     graphControls.current?.scaleZoom(inOrOut === 'in' ? zoomInFactor : zoomOutFactor)
   }
 
-  const handleResetZoom = () => {
+  const handleFitAll = () => {
     graphControls.current?.fitContent()
   }
 
   const handleCenterOnNode = () => {
-    graphControls.current?.centerOnPositionedNode(
-      `${nodeType}:${namespace}:${name}`,
-      DEFAULT_MAX_SCALE
-    )
+    graphControls.current?.centerOnPositionedNode(selectedId, Math.max(1, READABLE_SCALE))
   }
 
   const graphKinds = new Set<LayerNodeKind>(
@@ -172,10 +192,12 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
             <TableLevelDrawer />
           </Box>
         </Drawer>
-        <ZoomControls
-          handleCenterOnNode={handleCenterOnNode}
-          handleScaleZoom={handleScaleZoom}
-          handleResetZoom={handleResetZoom}
+        <TableZoomControls
+          onZoom={handleScaleZoom}
+          onFitAll={handleFitAll}
+          onCenter={handleCenterOnNode}
+          mapOpen={mapOpen}
+          onToggleMap={toggleMap}
         />
         {layersOpen && panelLayers.length > 0 && (
           <LayersPanel
@@ -200,6 +222,10 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
                 edges={edges}
                 direction='right'
                 layoutOptions={TABLE_LEVEL_LAYOUT_OPTIONS}
+                focusNodeId={selectedId}
+                focusMinScale={READABLE_SCALE}
+                miniMapPlacement={mapOpen ? MiniMapPlacement.BottomRight : MiniMapPlacement.None}
+                miniMapScale={MINIMAP_SCALE}
                 nodeRenderers={tableLevelNodeRenderer}
                 setZoomPanControls={setGraphControls}
               />

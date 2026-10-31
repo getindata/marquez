@@ -8,6 +8,8 @@ export interface TableLineageJobNodeData {
   job: LineageJob
   jobType: JobTypeInfo
   marks: NodeMarks
+  /** The selected node (a selected hidden job stands for its dataset); else the route decides. */
+  selected?: boolean
 }
 
 export interface TableLineageDatasetNodeData {
@@ -15,6 +17,7 @@ export interface TableLineageDatasetNodeData {
   marks: NodeMarks
   /** False when Compact nodes is on or the node is collapsed: the column rows are hidden. */
   showFields: boolean
+  selected?: boolean
 }
 
 export type TableLevelNodeData = TableLineageDatasetNodeData | TableLineageJobNodeData

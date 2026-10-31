@@ -107,6 +107,12 @@ describe('createElkNodes', () => {
     expect(sizes(undefined, false, 'dataset:oracle:fact')['dataset:oracle:fact']).toEqual([190, 48])
   })
 
+  it('marks only the selected node as selected', () => {
+    const { nodes } = createElkNodes(graph, SELECTED, false, true, null)
+    const selected = nodes.filter((n) => (n.data as { selected?: boolean }).selected)
+    expect(selected.map((n) => n.id)).toEqual([SELECTED])
+  })
+
   it('never draws the axis.layers catalog job', () => {
     expect(Object.keys(sizes())).not.toContain('job:oracle:axis.layers')
   })

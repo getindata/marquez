@@ -76,9 +76,10 @@ export const TableLineageDatasetNode = ({
   const { marks, showFields } = node.data
   // the node type counts too: Axis names a table's own job after the table
   const isSelected =
-    nodeType?.toLowerCase() === 'dataset' &&
-    name === lineageDataset.name &&
-    namespace === lineageDataset.namespace
+    node.data.selected ??
+    (nodeType?.toLowerCase() === 'dataset' &&
+      name === lineageDataset.name &&
+      namespace === lineageDataset.namespace)
   const isCollapsed = searchParams.get('collapsedNodes')?.split(',').includes(node.id)
   const wave = marks.fill
 

@@ -36,7 +36,8 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
   const { job, jobType, marks } = node.data
   // the node type counts too: Axis names a table's own job after the table
   const isSelected =
-    nodeType?.toLowerCase() === 'job' && name === job.name && namespace === job.namespace
+    node.data.selected ??
+    (nodeType?.toLowerCase() === 'job' && name === job.name && namespace === job.namespace)
   const wave = marks.fill
 
   if (isMiniMap) {

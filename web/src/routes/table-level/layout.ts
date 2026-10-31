@@ -162,6 +162,7 @@ export const createElkNodes = (
           job,
           jobType: jobTypeOf(job.facets),
           marks,
+          selected: node.id === currentGraphNode,
         },
       })
     } else if (node.type === 'DATASET') {
@@ -181,6 +182,7 @@ export const createElkNodes = (
           dataset: data,
           marks,
           showFields,
+          selected: node.id === currentGraphNode,
         },
       })
     }
