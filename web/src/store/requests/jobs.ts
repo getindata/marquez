@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { API_URL } from '../../globals'
-import { Jobs, RunState } from '../../types/api'
+import { Job, Jobs, RunState } from '../../types/api'
 import { Nullable } from '../../types/util/Nullable'
 import { genericFetchWrapper } from './index'
+import { isHiddenJob, jobNodeId } from '../../layers/hiddenJobs'
 
-export const getJobs = async (
+/** The largest page the jobs API serves. */
+const MAX_PAGE = 1000
+
+const jobsUrl = (
   namespace: Nullable<string>,
-  limit = 25,
-  offset = 0,
+  limit: number,
+  offset: number,
   lastRunStates?: RunState
 ) => {
   let url = `${API_URL}/jobs?limit=${limit}&offset=${offset}`
@@ -20,9 +24,71 @@ export const getJobs = async (
   if (lastRunStates) {
     url += `&lastRunStates=${lastRunStates}`
   }
-  return genericFetchWrapper(url, { method: 'GET' }, 'fetchJobs').then((r: Jobs) => {
-    return { totalCount: r.totalCount, jobs: r.jobs }
+  return url
+}
+
+/** Every job of a namespace (or of all namespaces), page by page. */
+export const fetchAllJobs = async (
+  namespace: Nullable<string>,
+  lastRunStates?: RunState
+): Promise<Job[]> => {
+  const all: Job[] = []
+  for (;;) {
+    const page: Jobs = await genericFetchWrapper(
+      jobsUrl(namespace, MAX_PAGE, all.length, lastRunStates),
+      { method: 'GET' },
+      'fetchJobs'
+    )
+    all.push(...page.jobs)
+    if (!page.jobs.length || all.length >= page.totalCount) return all
+  }
+}
+
+/**
+ * A page of the jobs the UI shows, and their count: each table's or view's own job and the
+ * `axis.layers` catalog job are left out (layers/hiddenJobs.ts), as on the lineage graph. The
+ * API cannot filter by facets, so this reads every job and pages here.
+ */
+export const getJobs = async (
+  namespace: Nullable<string>,
+  limit = 25,
+  offset = 0,
+  lastRunStates?: RunState
+) => {
+  const visible = (await fetchAllJobs(namespace, lastRunStates)).filter((j) => !isHiddenJob(j))
+  return { totalCount: visible.length, jobs: visible.slice(offset, offset + limit) }
+}
+
+export interface HiddenJobIndex {
+  /** Lineage node ids (`job:<namespace>:<name>`) of the hidden jobs. */
+  ids: Set<string>
+  /** When each hidden job was created, in ms. */
+  createdAt: number[]
+}
+
+const HIDDEN_INDEX_TTL_MS = 30_000
+let hiddenIndex: { at: number; index: Promise<HiddenJobIndex> } | null = null
+
+/** The hidden jobs of all namespaces, read at most every 30 s (for search and job counts). */
+export const hiddenJobIndex = (now = Date.now()): Promise<HiddenJobIndex> => {
+  if (hiddenIndex && now - hiddenIndex.at < HIDDEN_INDEX_TTL_MS) return hiddenIndex.index
+  const index = fetchAllJobs(null).then((jobs) => {
+    const hidden = jobs.filter(isHiddenJob)
+    return {
+      ids: new Set(hidden.map(jobNodeId)),
+      createdAt: hidden.map((j) => Date.parse(j.createdAt)),
+    }
   })
+  hiddenIndex = { at: now, index }
+  index.catch(() => {
+    hiddenIndex = null
+  })
+  return index
+}
+
+/** Forget the hidden-job index (tests). */
+export const resetHiddenJobIndex = () => {
+  hiddenIndex = null
 }
 
 export const deleteJob = async (namespace: string, jobName: string) => {
@@ -69,5 +135,9 @@ export const addJobTag = async (namespace: string, jobName: string, tag: string)
 
 export const getJobsByState = async (runState: RunState, limit: number, offset: number) => {
   const url = `${API_URL}/jobs?runState=${runState}&limit=${limit}&offset=${offset}`
-  return genericFetchWrapper(url, { method: 'POST' }, 'fetchJobsByState')
+  return genericFetchWrapper(url, { method: 'POST' }, 'fetchJobsByState').then((r: Jobs) => {
+    // the page as the API serves it, less the hidden jobs (this stock call pages server-side)
+    const jobs = r.jobs.filter((j) => !isHiddenJob(j))
+    return { totalCount: r.totalCount - (r.jobs.length - jobs.length), jobs }
+  })
 }
