@@ -211,6 +211,13 @@ impl LineageService {
                 .unwrap_or_default()
         };
 
+        // Current-version job facets for all jobs (one query)
+        let job_facets = if job_uuids.is_empty() {
+            HashMap::new()
+        } else {
+            db::lineage::get_current_job_facets(&self.pool, &job_uuids).await?
+        };
+
         // Build lookup maps
         let mut run_map: HashMap<(String, String), &RunWithFacetsRow> = HashMap::new();
         for run in &run_rows {
@@ -279,7 +286,8 @@ impl LineageService {
 
             // Build job node with data
             let latest_run = run_map.get(&(jdr.name.clone(), ns.to_string()));
-            let job_data = build_job_node_data(jdr, latest_run.copied(), &ds_map);
+            let job_data =
+                build_job_node_data(jdr, latest_run.copied(), job_facets.get(&jdr.uuid), &ds_map);
 
             nodes.push(Node {
                 id: job_node_id,
@@ -365,10 +373,12 @@ fn wrap_dataset_versions(raw: &serde_json::Value) -> serde_json::Value {
 
 /// Build the `data` JSON for a job node in the lineage graph.
 ///
-/// Matches the frontend's `LineageJob` interface.
+/// Matches the frontend's `LineageJob` interface. `facets` are the job's
+/// current-version job facets (not run facets); a job without any gets `{}`.
 fn build_job_node_data(
     jdr: &JobDataRow,
     run: Option<&RunWithFacetsRow>,
+    facets: Option<&serde_json::Value>,
     ds_map: &HashMap<Uuid, &DatasetDataRow>,
 ) -> serde_json::Value {
     let ns = jdr.namespace_name.as_deref().unwrap_or_default();
@@ -470,6 +480,7 @@ fn build_job_node_data(
         "currentRunUuid": jdr.current_run_uuid,
         "parentJobName": jdr.parent_job_name,
         "parentJobUuid": jdr.parent_job_uuid,
+        "facets": facets.cloned().unwrap_or_else(|| serde_json::json!({})),
     })
 }
 
