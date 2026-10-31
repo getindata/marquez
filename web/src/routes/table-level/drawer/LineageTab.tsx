@@ -23,15 +23,17 @@ import React, { CSSProperties, ReactNode } from 'react'
  * are collapsed as on the graph. Every name focuses its node in the graph, as a card click does.
  */
 
-const NAME_CHARS = 56
+/** Names are cut from the front to fit the 640px drawer, a job's beside its wave chip. */
+const JOB_CHARS = 60
+const DATASET_CHARS = 56
 
-const DatasetLinks = ({ verb, datasets }: { verb: string; datasets: DatasetRef[] }) => {
+const DatasetLinks = ({ lead, datasets }: { lead?: ReactNode; datasets: DatasetRef[] }) => {
   const t = useAxisTokens()
   const [searchParams] = useSearchParams()
-  if (!datasets.length) return null
+  if (!datasets.length && !lead) return null
   return (
     <div style={{ marginTop: 4, fontSize: 12, color: t.muted, lineHeight: 1.6 }}>
-      {verb && `${verb} `}
+      {lead}
       {datasets.map((d, i) => (
         <React.Fragment key={d.id}>
           {i > 0 && ', '}
@@ -41,7 +43,7 @@ const DatasetLinks = ({ verb, datasets }: { verb: string; datasets: DatasetRef[]
             title={`${d.namespace} · ${d.name}`}
             style={linkStyle(t.link, t.mono)}
           >
-            {tailFit(d.name, NAME_CHARS)}
+            {tailFit(d.name, DATASET_CHARS)}
           </Link>
         </React.Fragment>
       ))}
@@ -114,16 +116,26 @@ const JobRow = ({
           data-testid='lineage-job'
           to={nodeUrl('job', job.namespace, job.name, entry.id, searchParams)}
           title={`${job.namespace} · ${job.name}`}
-          style={{ ...linkStyle(t.link, t.mono), fontWeight: 600, overflow: 'hidden' }}
+          style={{
+            ...linkStyle(t.link, t.mono),
+            fontWeight: 600,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
         >
-          {tailFit(job.name, NAME_CHARS)}
+          {tailFit(job.name, JOB_CHARS)}
         </Link>
-        <span style={{ color: t.muted, fontSize: 11, whiteSpace: 'nowrap' }}>
-          {jobType.caption}
-        </span>
         {marks.fill && <FillChip fill={marks.fill} />}
       </div>
-      <DatasetLinks verb={verb} datasets={entry.datasets} />
+      <DatasetLinks
+        lead={
+          <>
+            <span data-testid='job-type-caption'>{jobType.caption}</span>
+            {entry.datasets.length > 0 && ` · ${verb} `}
+          </>
+        }
+        datasets={entry.datasets}
+      />
     </Row>
   )
 }
@@ -137,7 +149,7 @@ const DirectRow = ({ label, datasets }: { label: string; datasets: DatasetRef[] 
       <div data-testid='lineage-direct' style={{ fontSize: 12.5, color: t.text }}>
         {label}
       </div>
-      <DatasetLinks verb='' datasets={datasets} />
+      <DatasetLinks datasets={datasets} />
     </Row>
   )
 }
