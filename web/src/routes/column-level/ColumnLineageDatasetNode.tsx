@@ -2,9 +2,9 @@ import { ColumnLineageDatasetNodeData } from './nodes'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { PositionedNode } from '../../../libs/graph'
 import { faDatabase } from '@fortawesome/free-solid-svg-icons'
-import { theme } from '../../helpers/theme'
 import { truncateText } from '../../helpers/text'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { useTheme } from '@mui/material/styles'
 import Box from '@mui/system/Box'
 import React from 'react'
 
@@ -12,6 +12,8 @@ interface ColumnLineageDatasetNodeProps {
   node: PositionedNode<'dataset', ColumnLineageDatasetNodeData>
 }
 export const ColumnLineageDatasetNode = ({ node }: ColumnLineageDatasetNodeProps) => {
+  // the active colour scheme's MUI theme, not the static Dark one
+  const theme = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const { namespace, name } = useParams()
   const shine = name === node.data.dataset && namespace === node.data.namespace
