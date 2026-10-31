@@ -6,7 +6,7 @@ RUN apk add --no-cache git
 COPY package*.json ./
 COPY libs ./libs
 
-RUN npm install
+RUN npm ci --no-audit --no-fund
 
 COPY . .
 
