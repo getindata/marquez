@@ -1,3 +1,14 @@
+## Axis fork
+
+This is [getindata](https://github.com/getindata)'s fork of [Ilum's Marquez](https://github.com/ilum-cloud/marquez), used by the [Axis](https://github.com/getindata/axis) migration tool to show the lineage of a migrated system. Axis work lands on the `axis/main` branch through pull requests; `main` tracks Ilum's `main`, and each Ilum release is merged into `axis/main` deliberately.
+
+What differs from Ilum's Marquez:
+
+- **Job facets in the lineage response.** Job nodes of `GET /api/v1/lineage` carry `facets`: the job's current-version job facets, merged by facet name, the newest event winning (`{}` when the job has none). The web's `LineageJob` type has the field.
+- **Images.** Pushes to `axis/main` and tags `v<ilum version>-axis.<n>` build `ghcr.io/getindata/marquez` (the Rust API) and `ghcr.io/getindata/marquez-web` for linux/amd64 and linux/arm64 ([workflow](.github/workflows/axis-images.yml)), tagged `axis-main` or the tag without its `v`, plus `sha-<short>`.
+
+The Axis lineage UI (layers, job-type glyphs, branding) comes in a later change. Design and plan: [getindata/axis#586](https://github.com/getindata/axis/issues/586).
+
 https://github.com/user-attachments/assets/db70aa84-326e-468a-acd6-832d60c93651
 
 **[Ilum](https://ilum.cloud/) fork.** This is an Ilum-maintained fork of Marquez created while upstream development slowed. We used it to ship critical fixes and additive features without breaking compatibility. From **0.52.x**, we’re aligning with upstream and contributing improvements back. Starting with **0.54.x**, the API backend has been rewritten in Rust for improved performance and lower resource usage. Learn more in our short write-up: [Ilum × Marquez — Project Description & Rationale](ILUMxMARQUEZ.md).
