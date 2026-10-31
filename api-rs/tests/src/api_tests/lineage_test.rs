@@ -874,3 +874,63 @@ async fn lineage_dataset_node_facets_merge_newest_wins() {
         "older facet names stay when the newer event omits them: {facets}"
     );
 }
+
+/// A dataset-only lineage node (no job reads or writes it) whose current
+/// version has no qualifying facet rows gets `facets: {}`.
+#[tokio::test]
+async fn lineage_dataset_only_node_without_facets_gets_empty_object() {
+    let app = TestApp::new().await;
+
+    let ns = format!("ds_only_ns_{}", rand::random_range(0..u32::MAX));
+    let src = format!("ds_only_src_{}", rand::random_range(0..u32::MAX));
+    let ds = format!("orphan_{}", rand::random_range(0..u32::MAX));
+
+    create_namespace(&app, &ns, "test_owner").await;
+    let resp = app
+        .client
+        .put(format!("{}/api/v1/sources/{}", app.base_url, src))
+        .json(&serde_json::json!({
+            "type": "POSTGRESQL",
+            "connectionUrl": "postgresql://localhost:5432/test"
+        }))
+        .send()
+        .await
+        .expect("create source");
+    assert!(
+        resp.status().is_success(),
+        "create source: {}",
+        resp.status()
+    );
+    let resp = app
+        .client
+        .put(format!(
+            "{}/api/v1/namespaces/{}/datasets/{}",
+            app.base_url,
+            encode(&ns),
+            ds
+        ))
+        .json(&serde_json::json!({
+            "type": "DB_TABLE",
+            "physicalName": ds,
+            "sourceName": src
+        }))
+        .send()
+        .await
+        .expect("create dataset");
+    assert!(
+        resp.status().is_success(),
+        "create dataset: {}",
+        resp.status()
+    );
+
+    let node_id = format!("dataset:{}:{}", ns, ds);
+    let graph = get_graph(&app, &node_id).await;
+    assert_eq!(graph.len(), 1, "dataset-only graph: {graph:?}");
+    let node = find_node(&graph, &node_id);
+    assert_eq!(node["type"], "DATASET");
+    assert_eq!(
+        node["data"]["facets"],
+        serde_json::json!({}),
+        "a dataset without facet rows gets {{}}: {node}"
+    );
+}
