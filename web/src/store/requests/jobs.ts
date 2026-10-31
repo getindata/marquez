@@ -222,11 +222,10 @@ export const addJobTag = async (namespace: string, jobName: string, tag: string)
   return genericFetchWrapper(url, { method: 'POST' }, 'addJobTag')
 }
 
-export const getJobsByState = async (runState: RunState, limit: number, offset: number) => {
-  const url = `${API_URL}/jobs?runState=${runState}&limit=${limit}&offset=${offset}`
-  return genericFetchWrapper(url, { method: 'POST' }, 'fetchJobsByState').then((r: Jobs) => {
-    // the page as the API serves it, less the hidden jobs (this stock call pages server-side)
-    const jobs = r.jobs.filter((j) => !isHiddenJob(j))
-    return { totalCount: r.totalCount - (r.jobs.length - jobs.length), jobs }
-  })
-}
+/**
+ * Jobs whose latest run is in `runState`, paged and counted like the Jobs list: through the jobs
+ * API's `lastRunStates` filter and getJobs, so hidden jobs on any page are left out of the
+ * page and the total alike.
+ */
+export const getJobsByState = async (runState: RunState, limit: number, offset: number) =>
+  getJobs(null, limit, offset, runState)

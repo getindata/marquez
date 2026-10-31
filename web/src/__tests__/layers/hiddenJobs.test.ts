@@ -5,6 +5,7 @@ import * as requestUtils from '../../store/requests'
 import { IntervalMetric, getIntervalMetrics } from '../../store/requests/intervalMetrics'
 import {
   getJobs,
+  getJobsByState,
   hiddenJobIndex,
   hiddenJobIndexOrNull,
   resetHiddenJobIndex,
@@ -138,6 +139,14 @@ describe('job lists and counts without hidden jobs', () => {
     } finally {
       jest.useRealTimers()
     }
+  })
+
+  it('counts jobs by run state without the hidden jobs of any page', async () => {
+    spy.mockImplementation((url: string) => serveJobs(url))
+    const firstPage = await getJobsByState('COMPLETED', 2, 0)
+    expect(firstPage.totalCount).toBe(3) // 8 jobs, 5 of them hidden on various pages
+    expect(firstPage.jobs.map((j) => j.name)).toEqual(['s.load_a', 's.pkg'])
+    expect(spy.mock.calls[0][0]).toContain('/jobs?limit=1000&offset=0&lastRunStates=COMPLETED')
   })
 
   it('reads every page when there are more jobs than one page holds', async () => {
