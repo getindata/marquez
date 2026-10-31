@@ -133,7 +133,7 @@ const LIGHT: AxisTokens = {
   ringGlow: '0 0 12px rgba(47,111,179,.30)',
   edge: '#9aa3af',
   chipBase: '#ffffff',
-  chipWeight: 0.3,
+  chipWeight: 0.4,
   chipText: '#1f2328',
   drawer: '#ffffff',
   symbolDots: '#1f2328',
