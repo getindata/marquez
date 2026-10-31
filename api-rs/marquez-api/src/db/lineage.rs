@@ -354,6 +354,39 @@ pub async fn get_current_job_facets(
     Ok(rows.into_iter().collect())
 }
 
+/// Get the dataset facets of each dataset's current version, for all given
+/// dataset UUIDs in one query.
+///
+/// Same rows and rule as the dataset endpoint
+/// (`GET /namespaces/{ns}/datasets/{name}`): `dataset_facets` of the
+/// dataset's `current_version_uuid`, types `dataset`, `unknown` and `input`,
+/// merged into one flat object by facet name, the newest
+/// `lineage_event_time` winning. Datasets without facets are absent from
+/// the map.
+pub async fn get_current_dataset_facets(
+    pool: &PgPool,
+    dataset_uuids: &[Uuid],
+) -> Result<HashMap<Uuid, serde_json::Value>, sqlx::Error> {
+    let rows: Vec<(Uuid, serde_json::Value)> = sqlx::query_as(
+        "SELECT kv.dataset_uuid, jsonb_object_agg(kv.key, kv.value) AS facets \
+         FROM ( \
+             SELECT DISTINCT ON (d.uuid, kv2.key) d.uuid AS dataset_uuid, kv2.key, kv2.value \
+             FROM datasets d \
+             INNER JOIN dataset_facets df ON df.dataset_version_uuid = d.current_version_uuid \
+             CROSS JOIN LATERAL jsonb_each(df.facet) AS kv2(key, value) \
+             WHERE d.uuid = ANY($1) \
+               AND LOWER(df.type) IN ('dataset', 'unknown', 'input') \
+               AND df.facet IS NOT NULL \
+             ORDER BY d.uuid, kv2.key, df.lineage_event_time DESC, df.created_at DESC \
+         ) kv \
+         GROUP BY kv.dataset_uuid",
+    )
+    .bind(dataset_uuids)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().collect())
+}
+
 /// Get the current (latest) runs with facets for the given job UUIDs.
 ///
 /// Uses LATERAL JOINs to aggregate run args, input/output dataset versions,

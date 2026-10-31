@@ -61,11 +61,14 @@ impl LineageService {
                         db::lineage::get_dataset_data_by_name(&self.pool, ns_name, name).await?;
                     if let Some(ds) = ds_rows.first() {
                         if !ds_uuids.contains(&ds.uuid) {
+                            let facets =
+                                db::lineage::get_current_dataset_facets(&self.pool, &[ds.uuid])
+                                    .await?;
                             return Ok(Lineage {
                                 graph: vec![Node {
                                     id: NodeId::new(format!("dataset:{}:{}", ns_name, name)),
                                     type_: NodeType::Dataset,
-                                    data: Some(build_dataset_node_data(ds)),
+                                    data: Some(build_dataset_node_data(ds, facets.get(&ds.uuid))),
                                     in_edges: vec![],
                                     out_edges: vec![],
                                 }],
@@ -79,15 +82,20 @@ impl LineageService {
                     let ds_rows =
                         db::lineage::get_dataset_data_by_name(&self.pool, ns_name, name).await?;
                     match ds_rows.into_iter().next() {
-                        Some(ds) => Ok(Lineage {
-                            graph: vec![Node {
-                                id: NodeId::new(format!("dataset:{}:{}", ns_name, name)),
-                                type_: NodeType::Dataset,
-                                data: Some(build_dataset_node_data(&ds)),
-                                in_edges: vec![],
-                                out_edges: vec![],
-                            }],
-                        }),
+                        Some(ds) => {
+                            let facets =
+                                db::lineage::get_current_dataset_facets(&self.pool, &[ds.uuid])
+                                    .await?;
+                            Ok(Lineage {
+                                graph: vec![Node {
+                                    id: NodeId::new(format!("dataset:{}:{}", ns_name, name)),
+                                    type_: NodeType::Dataset,
+                                    data: Some(build_dataset_node_data(&ds, facets.get(&ds.uuid))),
+                                    in_edges: vec![],
+                                    out_edges: vec![],
+                                }],
+                            })
+                        }
                         None => Err(AppError::NotFound(format!(
                             "Dataset '{}/{}' not found",
                             ns_name, name
@@ -199,6 +207,13 @@ impl LineageService {
             vec![]
         } else {
             db::lineage::get_dataset_data(&self.pool, &all_ds_uuids).await?
+        };
+
+        // Current-version dataset facets for all datasets (one query)
+        let dataset_facets = if all_ds_uuids.is_empty() {
+            HashMap::new()
+        } else {
+            db::lineage::get_current_dataset_facets(&self.pool, &all_ds_uuids).await?
         };
 
         // Get current runs with facets for all jobs
@@ -335,7 +350,7 @@ impl LineageService {
                 nodes.push(Node {
                     id: ds_node_id,
                     type_: NodeType::Dataset,
-                    data: Some(build_dataset_node_data(ds)),
+                    data: Some(build_dataset_node_data(ds, dataset_facets.get(ds_uuid))),
                     in_edges,
                     out_edges,
                 });
@@ -486,8 +501,12 @@ fn build_job_node_data(
 
 /// Build the `data` JSON for a dataset node in the lineage graph.
 ///
-/// Matches the frontend's `LineageDataset` interface.
-fn build_dataset_node_data(ds: &DatasetDataRow) -> serde_json::Value {
+/// Matches the frontend's `LineageDataset` interface. `facets` are the
+/// dataset's current-version facets; a dataset without any gets `{}`.
+fn build_dataset_node_data(
+    ds: &DatasetDataRow,
+    facets: Option<&serde_json::Value>,
+) -> serde_json::Value {
     let ns = ds.namespace_name.as_deref().unwrap_or_default();
     serde_json::json!({
         "id": {"namespace": ns, "name": ds.name},
@@ -503,5 +522,6 @@ fn build_dataset_node_data(ds: &DatasetDataRow) -> serde_json::Value {
         "lastModifiedAt": iso8601::fmt_opt(&ds.last_modified_at),
         "description": ds.description,
         "lastLifecycleState": ds.lifecycle_state.as_deref().unwrap_or(""),
+        "facets": facets.cloned().unwrap_or_else(|| serde_json::json!({})),
     })
 }

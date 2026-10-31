@@ -718,3 +718,159 @@ async fn lineage_job_node_facets_merge_newest_wins() {
         "a job without facets gets {{}}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Dataset facets on dataset nodes
+// ---------------------------------------------------------------------------
+
+/// POST a raw OpenLineage event.
+async fn post_event(app: &TestApp, event: Value) {
+    let resp = app
+        .client
+        .post(format!("{}/api/v1/lineage", app.base_url))
+        .json(&event)
+        .send()
+        .await
+        .expect("post lineage event");
+    assert_eq!(resp.status(), 201, "POST event should succeed");
+}
+
+fn schema_facet() -> Value {
+    serde_json::json!({
+        "_producer": "test",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-1-1/SchemaDatasetFacet.json",
+        "fields": [
+            { "name": "order_id", "type": "NUMBER" },
+            { "name": "amount", "type": "NUMBER" }
+        ]
+    })
+}
+
+fn find_node<'a>(graph: &'a [Value], id: &str) -> &'a Value {
+    graph
+        .iter()
+        .find(|n| n["id"] == id)
+        .unwrap_or_else(|| panic!("node {id} missing: {graph:?}"))
+}
+
+/// A dataset node's data carries the facets of the dataset's current
+/// version: `schema` and a custom facet come back flat under `data.facets`.
+#[tokio::test]
+async fn lineage_dataset_node_carries_dataset_facets() {
+    let app = TestApp::new().await;
+
+    let ns = format!("ds_facets_ns_{}", rand::random_range(0..u32::MAX));
+    let job = generators::new_job_name();
+    let input = format!("input_{}", rand::random_range(0..u32::MAX));
+    let output = format!("output_{}", rand::random_range(0..u32::MAX));
+
+    post_event(
+        &app,
+        serde_json::json!({
+            "eventType": "COMPLETE",
+            "eventTime": "2026-10-30T10:00:00.000Z",
+            "run": { "runId": generators::new_run_id().to_string() },
+            "job": { "namespace": ns, "name": job },
+            "inputs": [{ "namespace": ns, "name": input }],
+            "outputs": [{
+                "namespace": ns,
+                "name": output,
+                "facets": {
+                    "schema": schema_facet(),
+                    "axisLayers": axis_layers_facet(1)
+                }
+            }],
+            "producer": "test"
+        }),
+    )
+    .await;
+
+    let graph = get_graph(&app, &format!("job:{}:{}", ns, job)).await;
+    let facets = &find_node(&graph, &format!("dataset:{}:{}", ns, output))["data"]["facets"];
+
+    assert_eq!(
+        facets["schema"]["fields"][0]["name"], "order_id",
+        "facets: {facets}"
+    );
+    assert_eq!(
+        facets["axisLayers"]["values"]["wave"]["value"], 1,
+        "facets: {facets}"
+    );
+    // The input carries no event facets. The server still writes its own
+    // `lineageStatistics` facet for every dataset in the lineage.
+    let input_facets = find_node(&graph, &format!("dataset:{}:{}", ns, input))["data"]["facets"]
+        .as_object()
+        .expect("input dataset facets should be an object")
+        .clone();
+    assert!(
+        input_facets.keys().all(|k| k == "lineageStatistics"),
+        "input dataset should carry no event facets: {input_facets:?}"
+    );
+}
+
+/// Facets merge by name across the events that touch the dataset's
+/// current version, the newest event winning: a later job reading the
+/// dataset updates `axisLayers` and `schema` stays.
+#[tokio::test]
+async fn lineage_dataset_node_facets_merge_newest_wins() {
+    let app = TestApp::new().await;
+
+    let ns = format!("ds_facets_merge_ns_{}", rand::random_range(0..u32::MAX));
+    let producer = generators::new_job_name();
+    let consumer = generators::new_job_name();
+    let source = format!("source_{}", rand::random_range(0..u32::MAX));
+    let middle = format!("middle_{}", rand::random_range(0..u32::MAX));
+    let sink = format!("sink_{}", rand::random_range(0..u32::MAX));
+
+    // The producer writes `middle` with schema and wave 1.
+    post_event(
+        &app,
+        serde_json::json!({
+            "eventType": "COMPLETE",
+            "eventTime": "2026-10-30T10:00:00.000Z",
+            "run": { "runId": generators::new_run_id().to_string() },
+            "job": { "namespace": ns, "name": producer },
+            "inputs": [{ "namespace": ns, "name": source }],
+            "outputs": [{
+                "namespace": ns,
+                "name": middle,
+                "facets": {
+                    "schema": schema_facet(),
+                    "axisLayers": axis_layers_facet(1)
+                }
+            }],
+            "producer": "test"
+        }),
+    )
+    .await;
+    // Later, the consumer reads `middle` (same version) with wave 2 only.
+    post_event(
+        &app,
+        serde_json::json!({
+            "eventType": "COMPLETE",
+            "eventTime": "2026-10-30T11:00:00.000Z",
+            "run": { "runId": generators::new_run_id().to_string() },
+            "job": { "namespace": ns, "name": consumer },
+            "inputs": [{
+                "namespace": ns,
+                "name": middle,
+                "facets": { "axisLayers": axis_layers_facet(2) }
+            }],
+            "outputs": [{ "namespace": ns, "name": sink }],
+            "producer": "test"
+        }),
+    )
+    .await;
+
+    let graph = get_graph(&app, &format!("job:{}:{}", ns, producer)).await;
+    let facets = &find_node(&graph, &format!("dataset:{}:{}", ns, middle))["data"]["facets"];
+
+    assert_eq!(
+        facets["axisLayers"]["values"]["wave"]["value"], 2,
+        "newest event's axisLayers should win: {facets}"
+    );
+    assert_eq!(
+        facets["schema"]["fields"][1]["name"], "amount",
+        "older facet names stay when the newer event omits them: {facets}"
+    );
+}
