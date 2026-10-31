@@ -100,6 +100,10 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
     [catalog, layersParam]
   )
   const closeLayers = useCallback(() => setLayersOpen(false), [])
+  const closeDrawer = () => {
+    searchParams.delete('tableLevelNode')
+    setSearchParams(searchParams)
+  }
 
   // one hop more than shown, cut on the collapsed graph; Full graph asks for at least
   // FULL_GRAPH_DEPTH hops, more if Depth asks for more
@@ -173,10 +177,7 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
         <Drawer
           anchor={'right'}
           open={!!searchParams.get('tableLevelNode')}
-          onClose={() => {
-            searchParams.delete('tableLevelNode')
-            setSearchParams(searchParams)
-          }}
+          onClose={closeDrawer}
           PaperProps={{
             sx: {
               backgroundColor: t.drawer,
@@ -186,8 +187,8 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
             },
           }}
         >
-          <Box>
-            <TableLevelDrawer />
+          <Box height='100%'>
+            <TableLevelDrawer catalog={catalog} onClose={closeDrawer} />
           </Box>
         </Drawer>
         <TableZoomControls

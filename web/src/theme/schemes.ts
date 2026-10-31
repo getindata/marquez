@@ -58,6 +58,22 @@ export interface AxisTokens {
   drawer: string
   /** The Axis symbol's dots (its row stays Xebia magenta: it is the brand mark). */
   symbolDots: string
+  /** Inline code in the table drawer (job names, a rule's effect). */
+  code: string
+  link: string
+  /** "applied", "converted": a done state. */
+  done: string
+  /** The table drawer's rule chips: background and text per kind. */
+  tagBg: string
+  tagText: string
+  deterministicBg: string
+  deterministicText: string
+  agentBg: string
+  agentText: string
+  gapBg: string
+  gapText: string
+  verifiedBg: string
+  verifiedText: string
   /** Editor colours for syntax highlighting: VS Code Dark+ or Light+. */
   editor: 'dark-plus' | 'light-plus'
   font: string
@@ -100,6 +116,19 @@ const DARK: AxisTokens = {
   chipText: '#ffffff',
   drawer: '#1b1e24',
   symbolDots: '#d7dae0',
+  code: '#a9c7e8',
+  link: '#7cc8f2',
+  done: '#22c55e',
+  tagBg: '#30353e',
+  tagText: '#a3a9b4',
+  deterministicBg: '#1d3550',
+  deterministicText: '#7cc8f2',
+  agentBg: '#3a2f14',
+  agentText: '#f6c453',
+  gapBg: '#3d2222',
+  gapText: '#ff8f8f',
+  verifiedBg: '#15352a',
+  verifiedText: '#34d399',
   editor: 'dark-plus',
   font: FONT,
   mono: MONO,
@@ -137,6 +166,19 @@ const LIGHT: AxisTokens = {
   chipText: '#1f2328',
   drawer: '#ffffff',
   symbolDots: '#1f2328',
+  code: '#2f6fb3',
+  link: '#2f6fb3',
+  done: '#16794a',
+  tagBg: '#eceef1',
+  tagText: '#5c6470',
+  deterministicBg: '#e1effb',
+  deterministicText: '#1d5f99',
+  agentBg: '#fdf1d6',
+  agentText: '#8a5a00',
+  gapBg: '#fde4e4',
+  gapText: '#b42318',
+  verifiedBg: '#dcf5e8',
+  verifiedText: '#16794a',
   editor: 'light-plus',
   font: FONT,
   mono: MONO,
@@ -174,6 +216,19 @@ const XEBIA: AxisTokens = {
   chipText: '#ffffff',
   drawer: '#160d22',
   symbolDots: '#ece6f2',
+  code: '#C57DC5',
+  link: '#7cc8f2',
+  done: '#22c55e',
+  tagBg: '#2a2038',
+  tagText: '#9a8fab',
+  deterministicBg: '#13304a',
+  deterministicText: '#7cc8f2',
+  agentBg: '#3a2a10',
+  agentText: '#f6c453',
+  gapBg: '#3a1a1a',
+  gapText: '#ff8f8f',
+  verifiedBg: '#123326',
+  verifiedText: '#34d399',
   editor: 'dark-plus',
   font: FONT,
   mono: MONO,
