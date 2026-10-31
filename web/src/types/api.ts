@@ -177,6 +177,7 @@ export interface Job {
   tags: string[]
   parentJobName: Nullable<string>
   parentJobUuid: Nullable<string>
+  facets?: Record<string, unknown>
 }
 
 export interface JobId {
