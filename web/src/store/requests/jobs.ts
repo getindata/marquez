@@ -106,28 +106,77 @@ export interface HiddenJobIndex {
 }
 
 const HIDDEN_INDEX_TTL_MS = 30_000
-let hiddenIndex: { at: number; index: Promise<HiddenJobIndex> } | null = null
+/** How long search and the jobs chart wait for a first index before showing unfiltered data. */
+export const HIDDEN_INDEX_WAIT_MS = 3_000
 
-/** The hidden jobs of all namespaces, read at most every 30 s (for search and job counts). */
-export const hiddenJobIndex = (now = Date.now()): Promise<HiddenJobIndex> => {
-  if (hiddenIndex && now - hiddenIndex.at < HIDDEN_INDEX_TTL_MS) return hiddenIndex.index
-  const index = fetchAllJobs(null).then((jobs) => {
-    const hidden = jobs.filter(isHiddenJob)
-    return {
-      ids: new Set(hidden.map(jobNodeId)),
-      createdAt: hidden.map((j) => Date.parse(j.createdAt)),
-    }
+let hiddenIndex: { at: number; value: HiddenJobIndex } | null = null
+let hiddenIndexInFlight: Promise<HiddenJobIndex> | null = null
+
+const readHiddenIndex = (): Promise<HiddenJobIndex> => {
+  if (!hiddenIndexInFlight) {
+    hiddenIndexInFlight = fetchAllJobs(null).then(
+      (jobs) => {
+        const hidden = jobs.filter(isHiddenJob)
+        const value = {
+          ids: new Set(hidden.map(jobNodeId)),
+          createdAt: hidden.map((j) => Date.parse(j.createdAt)),
+        }
+        // the 30 s start when the read completes, not when it starts
+        hiddenIndex = { at: Date.now(), value }
+        hiddenIndexInFlight = null
+        return value
+      },
+      (error) => {
+        hiddenIndexInFlight = null
+        throw error
+      }
+    )
+  }
+  return hiddenIndexInFlight
+}
+
+/**
+ * The hidden jobs of all namespaces. A fresh index (under 30 s old) is returned as it is; an
+ * older one is returned at once while one read refreshes it; only the first call waits for a
+ * read. Reads never overlap.
+ */
+export const hiddenJobIndex = (): Promise<HiddenJobIndex> => {
+  if (hiddenIndex && Date.now() - hiddenIndex.at < HIDDEN_INDEX_TTL_MS) {
+    return Promise.resolve(hiddenIndex.value)
+  }
+  const reading = readHiddenIndex()
+  if (hiddenIndex) {
+    reading.catch(() => undefined) // a failed refresh keeps the last index
+    return Promise.resolve(hiddenIndex.value)
+  }
+  return reading
+}
+
+/**
+ * The hidden-job index for search and the jobs chart, which never fail or stall on it: null
+ * when the first read fails or takes longer than HIDDEN_INDEX_WAIT_MS (they then show the
+ * API's own data).
+ */
+export const hiddenJobIndexOrNull = async (
+  waitMs = HIDDEN_INDEX_WAIT_MS
+): Promise<HiddenJobIndex | null> => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), waitMs)
   })
-  hiddenIndex = { at: now, index }
-  index.catch(() => {
-    hiddenIndex = null
-  })
-  return index
+  try {
+    return await Promise.race([hiddenJobIndex(), timeout])
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Forget the hidden-job index (tests). */
 export const resetHiddenJobIndex = () => {
   hiddenIndex = null
+  hiddenIndexInFlight = null
 }
 
 export const deleteJob = async (namespace: string, jobName: string) => {

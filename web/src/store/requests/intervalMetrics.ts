@@ -1,6 +1,6 @@
 import { API_URL } from '../../globals'
 import { genericFetchWrapper } from './index'
-import { hiddenJobIndex } from './jobs'
+import { hiddenJobIndexOrNull } from './jobs'
 
 export interface IntervalMetric {
   startInterval: string
@@ -22,7 +22,9 @@ export const getIntervalMetrics = async (payload: {
     'fetchIntervalMetrics'
   )
   if (payload.asset !== 'jobs' || !Array.isArray(metrics)) return metrics
-  return withoutHiddenJobs(metrics, (await hiddenJobIndex()).createdAt)
+  const index = await hiddenJobIndexOrNull()
+  // no index yet: the API's counts as they are
+  return index ? withoutHiddenJobs(metrics, index.createdAt) : metrics
 }
 
 /**

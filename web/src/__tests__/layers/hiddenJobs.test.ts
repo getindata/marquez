@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as requestUtils from '../../store/requests'
-import { IntervalMetric } from '../../store/requests/intervalMetrics'
+import { IntervalMetric, getIntervalMetrics } from '../../store/requests/intervalMetrics'
 import {
   getJobs,
   hiddenJobIndex,
+  hiddenJobIndexOrNull,
   resetHiddenJobIndex,
   resetJobSnapshots,
 } from '../../store/requests/jobs'
@@ -123,7 +124,7 @@ describe('job lists and counts without hidden jobs', () => {
   })
 
   it('reads again once the read is 30 s old', async () => {
-    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] })
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask'] })
     try {
       jest.setSystemTime(new Date('2026-10-31T12:00:00Z'))
       spy.mockImplementation((url: string) => serveJobs(url))
@@ -172,13 +173,69 @@ describe('job lists and counts without hidden jobs', () => {
     ])
   })
 
-  it('caches the hidden-job index for 30 s', async () => {
-    spy.mockImplementation((url: string) => serveJobs(url))
-    await hiddenJobIndex(1000)
-    await hiddenJobIndex(20_000)
-    expect(spy).toHaveBeenCalledTimes(1)
-    await hiddenJobIndex(40_000)
-    expect(spy).toHaveBeenCalledTimes(2)
+  it('keeps the index 30 s from when its read completes, and never overlaps reads', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask'] })
+    try {
+      let release: (() => void) | undefined
+      let slow = false
+      spy.mockImplementation((url: string) =>
+        slow
+          ? new Promise((resolve) => {
+              release = () => resolve(serveJobs(url))
+            })
+          : serveJobs(url)
+      )
+      jest.setSystemTime(new Date('2026-10-31T12:00:00Z'))
+      const first = await hiddenJobIndex()
+      expect(spy).toHaveBeenCalledTimes(1)
+
+      // 31 s later: the old index comes back at once while one read refreshes it
+      slow = true
+      jest.setSystemTime(new Date('2026-10-31T12:00:31Z'))
+      expect(await hiddenJobIndex()).toBe(first)
+      expect(await hiddenJobIndex()).toBe(first) // the read in flight is not started again
+      expect(spy).toHaveBeenCalledTimes(2)
+
+      // the refresh completes 40 s after the first read started; 25 s after that it is fresh
+      jest.setSystemTime(new Date('2026-10-31T12:00:40Z'))
+      release?.()
+      for (let i = 0; i < 20; i++) await Promise.resolve() // let the read settle
+      jest.setSystemTime(new Date('2026-10-31T12:01:05Z'))
+      const refreshed = await hiddenJobIndex()
+      expect(refreshed).not.toBe(first)
+      expect(spy).toHaveBeenCalledTimes(2)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('shows search results as the API gives them when the index read fails', async () => {
+    spy.mockImplementation((url: string) =>
+      url.includes('/search')
+        ? Promise.resolve({
+            totalCount: 1,
+            results: [{ type: 'JOB', name: 's.a', namespace: 'oracle', nodeId: 'job:oracle:s.a' }],
+          })
+        : Promise.reject(new Error('jobs API down'))
+    )
+    const found = await getSearch('s.a')
+    expect(found.totalCount).toBe(1)
+    expect(found.results).toHaveLength(1)
+  })
+
+  it('shows the jobs chart as the API gives it when the index read fails', async () => {
+    const raw: IntervalMetric[] = [
+      { startInterval: '2026-10-31T10:00:00Z', endInterval: '2026-10-31T11:00:00Z', count: 8 },
+    ]
+    spy.mockImplementation((url: string) =>
+      url.includes('/stats/jobs') ? Promise.resolve(raw) : Promise.reject(new Error('down'))
+    )
+    expect(await getIntervalMetrics({ asset: 'jobs', unit: 'day' })).toEqual(raw)
+  })
+
+  it('does not wait long for a slow first index', async () => {
+    spy.mockImplementation(() => new Promise(() => undefined)) // never answers
+    expect(await hiddenJobIndexOrNull(20)).toBeNull()
   })
 
   it('takes hidden jobs created before each interval end out of the cumulative counts', async () => {
