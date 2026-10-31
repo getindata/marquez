@@ -525,7 +525,7 @@ const Header = ({
               {shownWriters.map((w, i) => (
                 <React.Fragment key={w}>
                   {i > 0 && ', '}
-                  <code title={w} style={code(t)}>
+                  <code title={w} style={{ ...code(t), whiteSpace: 'nowrap' }}>
                     {tailFit(w, 40)}
                   </code>
                 </React.Fragment>
