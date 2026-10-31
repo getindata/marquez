@@ -4,7 +4,7 @@ This is [getindata](https://github.com/getindata)'s fork of [Ilum's Marquez](htt
 
 What differs from Ilum's Marquez:
 
-- **Job facets in the lineage response.** Job nodes of `GET /api/v1/lineage` carry `facets`: the job's current-version job facets, merged by facet name, the newest event winning (`{}` when the job has none). The web's `LineageJob` type has the field.
+- **Facets in the lineage response.** Job and dataset nodes of `GET /api/v1/lineage` carry `facets`: the job's or dataset's current-version facets, merged by facet name, the newest event winning (`{}` when there are none). Dataset nodes use the facet types the dataset endpoint uses. The web's `LineageJob` type gains the field; `LineageDataset` already had it.
 - **Images.** Pushes to `axis/main` and tags `v<ilum version>-axis.<n>` build `ghcr.io/getindata/marquez` (the Rust API) and `ghcr.io/getindata/marquez-web` for linux/amd64 and linux/arm64 ([workflow](.github/workflows/axis-images.yml)), tagged `axis-main` or the tag without its `v`, plus `sha-<short>`.
 
 The Axis lineage UI (layers, job-type glyphs, branding) comes in a later change. Design and plan: [getindata/axis#586](https://github.com/getindata/axis/issues/586).
