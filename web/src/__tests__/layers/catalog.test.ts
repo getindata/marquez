@@ -41,6 +41,21 @@ describe('parseLayerCatalog', () => {
     expect(problems).toEqual([expect.stringContaining('owner: unknown kind')])
   })
 
+  it('ignores an inherited name as a kind and keeps the valid layer after it', () => {
+    const { catalog, problems } = parseLayerCatalog({
+      layers: [
+        { id: 'future', kind: 'toString', slot: 'badge', appliesTo: ['job'] },
+        { id: 'proto', kind: '__proto__', slot: 'badge', appliesTo: ['job'] },
+        DESIGN_CATALOG.layers[0],
+      ],
+    })
+    expect(catalog?.layers.map((l) => l.id)).toEqual(['wave'])
+    expect(problems).toEqual([
+      expect.stringContaining('future: unknown kind'),
+      expect.stringContaining('proto: unknown kind'),
+    ])
+  })
+
   it('refuses a layer whose slot an earlier layer holds on the same node kind', () => {
     const { catalog, problems } = parseLayerCatalog({
       layers: [

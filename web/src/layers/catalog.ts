@@ -114,7 +114,8 @@ export const parseLayerCatalog = (raw: unknown): CatalogParseResult => {
       continue
     }
     const kind = asString(entry.kind) as LayerKind | undefined
-    if (!kind || !(kind in KIND_SLOTS)) {
+    // an own key only: `toString` and other inherited names are unknown kinds too
+    if (!kind || !Object.prototype.hasOwnProperty.call(KIND_SLOTS, kind)) {
       problems.push(`layer ${id}: unknown kind ${JSON.stringify(entry.kind)}, ignored`)
       continue
     }
