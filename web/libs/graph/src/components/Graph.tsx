@@ -33,6 +33,13 @@ interface Props<K, D> {
   dotGridColor?: string
   disableZoomPan?: boolean
   setZoomPanControls?: (controls: ZoomPanControls) => void
+  // ELK layout options merged over the library's defaults
+  layoutOptions?: Record<string, string>
+  // the MiniMap's size as a fraction of the container (default 1/8)
+  miniMapScale?: number
+  // open on this node at no less than focusMinScale (see ZoomPanSvg)
+  focusNodeId?: string
+  focusMinScale?: number
 }
 
 export const Graph = <K, D>({
@@ -54,6 +61,10 @@ export const Graph = <K, D>({
   disableZoomPan = false,
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   setZoomPanControls = () => {},
+  layoutOptions,
+  miniMapScale,
+  focusNodeId,
+  focusMinScale,
 }: Props<K, D>) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, containerHeight] = useSize(containerRef)
@@ -65,6 +76,7 @@ export const Graph = <K, D>({
     direction: direction ?? 'right',
     keepPreviousGraph: true,
     webWorkerUrl,
+    layoutOptions,
     getLayoutOptions: (node: Node<K, D>) =>
       nodeRenderers.get(node.kind)?.getLayoutOptions(node) || node,
   })
@@ -101,6 +113,9 @@ export const Graph = <K, D>({
           minScaleMinimum={minScaleMinimum}
           containerPadding={containerPadding}
           miniMapPlacement={miniMapPlacement}
+          miniMapScale={miniMapScale}
+          focusNodeId={focusNodeId}
+          focusMinScale={focusMinScale}
           miniMapContent={
             <>
               {positionedNodes?.map((node) => (

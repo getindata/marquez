@@ -9,11 +9,11 @@ import { NotFound } from '../routes/not-found/NotFound'
 import { Provider } from 'react-redux'
 import { ReduxRouter, createRouterMiddleware } from '@lagunovsky/redux-react-router'
 import { Route, Routes } from 'react-router-dom'
-import { StyledEngineProvider, ThemeProvider } from '@mui/material/styles'
+import { SchemeProvider } from '../theme'
+import { StyledEngineProvider } from '@mui/material/styles'
 import { applyMiddleware, createStore } from 'redux'
 import { composeWithDevTools } from '@redux-devtools/extension'
 import { createBrowserHistory } from 'history'
-import { theme } from '../helpers/theme'
 import ColumnLevel from '../routes/column-level/ColumnLevel'
 import Dashboard from '../routes/dashboard/Dashboard'
 import Datasets from '../routes/datasets/Datasets'
@@ -43,7 +43,7 @@ const store = createStore(
 
 sagaMiddleware.run(rootSaga)
 
-const TITLE = 'Marquez'
+const TITLE = 'Xebia Axis lineage'
 
 const App = (): ReactElement => {
   return (
@@ -51,7 +51,7 @@ const App = (): ReactElement => {
       <HelmetProvider>
         <ReduxRouter history={history}>
           <StyledEngineProvider injectFirst>
-            <ThemeProvider theme={theme}>
+            <SchemeProvider>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <Helmet>
                   <title>{TITLE}</title>
@@ -77,7 +77,7 @@ const App = (): ReactElement => {
                   <Toast />
                 </Box>
               </LocalizationProvider>
-            </ThemeProvider>
+            </SchemeProvider>
           </StyledEngineProvider>
         </ReduxRouter>
       </HelmetProvider>

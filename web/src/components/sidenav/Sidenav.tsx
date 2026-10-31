@@ -7,10 +7,12 @@ import SVG from 'react-inlinesvg'
 import { Link, useLocation } from 'react-router-dom'
 import Box from '@mui/material/Box'
 
+import { AxisSymbol } from '../header/AxisSymbol'
 import { DRAWER_WIDTH, HEADER_HEIGHT } from '../../helpers/theme'
 import { Divider, Drawer, createTheme } from '@mui/material'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCogs, faDatabase } from '@fortawesome/free-solid-svg-icons'
+import { useAxisTokens } from '../../theme'
 import MqIconButton from '../core/icon-button/MqIconButton'
 
 // for i18n
@@ -21,7 +23,6 @@ import { useTheme } from '@emotion/react'
 
 import { Dashboard } from '@mui/icons-material'
 import iconSearchArrow from '../../img/iconSearchArrow.svg'
-import marquez_logo from './marquez-icon-white-solid.svg'
 
 interface SidenavProps {}
 
@@ -31,6 +32,7 @@ const Sidenav: React.FC<SidenavProps> = () => {
     i18next.changeLanguage(lng)
   }
   const theme = createTheme(useTheme())
+  const t = useAxisTokens()
 
   const location = useLocation()
 
@@ -71,9 +73,11 @@ const Sidenav: React.FC<SidenavProps> = () => {
             alignItems={'center'}
             justifyContent={'center'}
             height={HEADER_HEIGHT}
+            width={'100%'}
+            sx={{ backgroundColor: t.night, borderBottom: `1px solid ${t.line}` }}
           >
-            <Link to='/'>
-              <img src={marquez_logo} height={40} alt='Marquez Logo' />
+            <Link to='/' aria-label='Xebia Axis lineage home' style={{ display: 'flex' }}>
+              <AxisSymbol size={32} light={t.symbolDots} />
             </Link>
           </Box>
           <Divider sx={{ my: 1 }} />

@@ -2,7 +2,7 @@ import { ColumnLevelNodeData, ColumnLevelNodeKinds } from './nodes'
 import { ColumnLineageGraph, ColumnLineageNode } from '../../types/api'
 import { Edge, Node as ElkNode } from '../../../libs/graph'
 import { Nullable } from '../../types/util/Nullable'
-import { theme } from '../../helpers/theme'
+import { theme as darkTheme } from '../../helpers/theme'
 
 /**
    Node of format dataset:food_delivery:public.categories:menu_id
@@ -52,7 +52,12 @@ export const findConnectedNodes = (
 
 export const createElkNodes = (
   columnLineageGraph: ColumnLineageGraph,
-  currentColumn: Nullable<string>
+  currentColumn: Nullable<string>,
+  /** Edge colours of the active colour scheme; the default Dark scheme's otherwise. */
+  edgeColors: { highlight: string; muted: string } = {
+    highlight: darkTheme.palette.primary.main,
+    muted: darkTheme.palette.grey[400],
+  }
 ) => {
   const nodes: ElkNode<ColumnLevelNodeKinds, ColumnLevelNodeData>[] = []
   const edges: Edge[] = []
@@ -74,8 +79,8 @@ export const createElkNodes = (
           targetNodeId: edge.destination,
           color:
             connectedNodes.includes(node) || connectedNodes.find((n) => n.id === edge.destination)
-              ? theme.palette.primary.main
-              : theme.palette.grey[400],
+              ? edgeColors.highlight
+              : edgeColors.muted,
         }
       })
     )

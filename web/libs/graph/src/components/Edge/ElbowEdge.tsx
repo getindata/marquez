@@ -43,6 +43,8 @@ export const ElbowEdge = ({ edge, isMiniMap }: EdgeProps) => {
         stroke={edge.color || grey['600']}
         strokeWidth={edge.strokeWidth || 2}
         strokeLinejoin='round'
+        strokeDasharray={edge.strokeDasharray}
+        strokeLinecap={edge.strokeDasharray ? 'round' : undefined}
         points={points.map(({ x, y }) => `${x},${y}`).join(' ')}
       />
       <EdgeLabel label={edge.label} endPointY={longestEdge?.y} />
@@ -52,7 +54,7 @@ export const ElbowEdge = ({ edge, isMiniMap }: EdgeProps) => {
           fill='none'
           strokeLinecap='round'
           stroke={edge.color || grey['600']}
-          strokeWidth={edge.strokeWidth || 5}
+          strokeWidth={edge.animatedStrokeWidth || edge.strokeWidth || 5}
           strokeLinejoin='round'
           strokeDasharray='0px 60px'
           animation={`${marchingAnts} infinite 2s linear`}

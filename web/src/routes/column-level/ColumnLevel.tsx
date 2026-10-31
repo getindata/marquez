@@ -4,7 +4,7 @@ import { ColumnLevelNodeData, ColumnLevelNodeKinds, columnLevelNodeRenderer } fr
 import { ColumnLineageGraph } from '../../types/api'
 import { Drawer } from '@mui/material'
 import { Graph, ZoomPanControls } from '../../../libs/graph'
-import { HEADER_HEIGHT, theme } from '../../helpers/theme'
+import { HEADER_HEIGHT } from '../../helpers/theme'
 import { IState } from '../../store/reducers'
 import { ZoomControls } from './ZoomControls'
 import { bindActionCreators } from 'redux'
@@ -13,6 +13,7 @@ import { createElkNodes } from './layout'
 import { fetchColumnLineage } from '../../store/actionCreators'
 import { useCallbackRef } from '../../helpers/hooks'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { useTheme } from '@mui/material/styles'
 import Box from '@mui/material/Box'
 import ColumnLevelDrawer from './ColumnLevelDrawer'
 import ParentSize from '@visx/responsive/lib/components/ParentSize'
@@ -35,6 +36,8 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
   fetchColumnLineage: fetchColumnLineage,
   columnLineage: columnLineage,
 }: ColumnLevelProps) => {
+  // the active colour scheme's MUI theme, not the static Dark one
+  const theme = useTheme()
   const { namespace, name } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -73,7 +76,10 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
     graphControls.current = zoomControls
   })
 
-  const { nodes, edges } = createElkNodes(columnLineage, searchParams.get('column'))
+  const { nodes, edges } = createElkNodes(columnLineage, searchParams.get('column'), {
+    highlight: theme.palette.primary.main,
+    muted: theme.palette.grey[400],
+  })
 
   useEffect(() => {
     setTimeout(() => {

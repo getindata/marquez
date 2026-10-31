@@ -3,14 +3,21 @@
 
 import { AppBar, Toolbar } from '@mui/material'
 import { DRAWER_WIDTH } from '../../helpers/theme'
+import { Link } from 'react-router-dom'
+import { SchemeSwitch, useAxisTokens } from '../../theme'
 import { createTheme } from '@mui/material/styles'
 import { useTheme } from '@emotion/react'
 import Box from '@mui/material/Box'
 import React, { ReactElement } from 'react'
 import Search from '../search/Search'
 
+/**
+ * Xebia Axis lineage branding: the "Xebia Axis" wordmark and a muted "lineage" (the Axis symbol
+ * sits before them in the side navigation's cell), the colour scheme switch and the stock search.
+ */
 const Header = (): ReactElement => {
   const theme = createTheme(useTheme())
+  const t = useAxisTokens()
 
   return (
     <AppBar
@@ -18,23 +25,44 @@ const Header = (): ReactElement => {
       elevation={0}
       sx={{
         zIndex: theme.zIndex.drawer + 1,
-        backgroundColor: theme.palette.background.default,
-        borderBottom: `2px dashed ${theme.palette.secondary.main}`,
+        backgroundColor: t.night,
+        backgroundImage: 'none',
+        borderBottom: `1px solid ${t.line}`,
         left: `${DRAWER_WIDTH + 1}px`,
+        width: `calc(100% - ${DRAWER_WIDTH + 1}px)`,
       }}
     >
-      <Toolbar disableGutters>
+      <Toolbar disableGutters sx={{ gap: 2, pr: 3 }} data-testid='axis-header'>
         <Box
+          component={Link}
+          to='/'
           sx={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            width: 'calc(100% - 97px)',
+            alignItems: 'baseline',
+            gap: '6px',
+            pl: 1,
+            color: t.text,
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
           }}
         >
-          <Box display={'flex'} alignItems={'center'}>
-            <Search />
+          <Box component='span' sx={{ fontWeight: 600, fontSize: 20, letterSpacing: '.2px' }}>
+            Xebia Axis
           </Box>
+          <Box component='span' sx={{ color: t.muted, fontSize: 14 }}>
+            lineage
+          </Box>
+        </Box>
+        <SchemeSwitch />
+        <Box
+          flex={1}
+          minWidth={0}
+          sx={{
+            '& #searchContainer': { width: '100%' },
+            '& .MuiInputBase-root': { bgcolor: 'transparent' },
+          }}
+        >
+          <Search />
         </Box>
       </Toolbar>
     </AppBar>

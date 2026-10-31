@@ -1,5 +1,5 @@
 import { CenterFocusStrong, CropFree, ZoomIn, ZoomOut } from '@mui/icons-material'
-import { theme } from '../../helpers/theme'
+import { useTheme } from '@mui/material/styles'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
@@ -16,6 +16,8 @@ export const ZoomControls = ({
   handleResetZoom,
   handleCenterOnNode,
 }: ZoomControlsProps) => {
+  // the active colour scheme's MUI theme, not the static Dark one
+  const theme = useTheme()
   return (
     <Box
       display={'flex'}

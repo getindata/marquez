@@ -1,8 +1,9 @@
 import { ArrowBackIosRounded, Refresh } from '@mui/icons-material'
 import { Divider, TextField } from '@mui/material'
-import { HEADER_HEIGHT, theme } from '../../helpers/theme'
+import { HEADER_HEIGHT } from '../../helpers/theme'
 import { fetchColumnLineage } from '../../store/actionCreators'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTheme } from '@mui/material/styles'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
@@ -16,6 +17,8 @@ interface ActionBarProps {
 }
 
 export const ActionBar = ({ fetchColumnLineage, depth, setDepth }: ActionBarProps) => {
+  // the active colour scheme's MUI theme, not the static Dark one
+  const theme = useTheme()
   const { namespace, name } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()

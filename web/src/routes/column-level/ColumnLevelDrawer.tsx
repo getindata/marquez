@@ -16,8 +16,8 @@ import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 import { faDatabase } from '@fortawesome/free-solid-svg-icons'
 import { fetchDataset } from '../../store/actionCreators'
-import { theme } from '../../helpers/theme'
 import { useSearchParams } from 'react-router-dom'
+import { useTheme } from '@mui/material/styles'
 import CloseIcon from '@mui/icons-material/Close'
 import IconButton from '@mui/material/IconButton'
 import MqJsonView from '../../components/core/json-view/MqJsonView'
@@ -42,6 +42,8 @@ const ColumnLevelDrawer = ({
   columnLineage,
   isDatasetLoading,
 }: StateProps & DispatchProps) => {
+  // the active colour scheme's MUI theme, not the static Dark one
+  const theme = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
     const dataset = searchParams.get('dataset')

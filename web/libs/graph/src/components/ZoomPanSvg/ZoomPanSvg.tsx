@@ -55,6 +55,16 @@ interface Props extends BoxProps {
    */
   miniMapPlacement?: MiniMapPlacement
   /*
+   * The MiniMap's size as a fraction of the container. Defaults to 1/8.
+   */
+  miniMapScale?: number
+  /*
+   * When the content changes, open on this node: centred at `focusMinScale` when showing the
+   * whole graph would be smaller than that, else the whole graph. Unset: the whole graph.
+   */
+  focusNodeId?: string
+  focusMinScale?: number
+  /*
    * Limit for zooming in. Defaults to 1.7.
    */
   maxScale?: number
@@ -117,6 +127,9 @@ export const ZoomPanSvg = ({
   setZoomPanControls,
   miniMapContent,
   miniMapPlacement,
+  miniMapScale = MINIMAP_SCALE,
+  focusNodeId,
+  focusMinScale,
   children,
   hideDotGrid = false,
   backgroundColor,
@@ -160,8 +173,8 @@ export const ZoomPanSvg = ({
   // The scroll/pan limits. These are set to 1/8 of the display size at minScale so that the user can pan content past the minimap and compare
   const translateExtent: Extent = useMemo(() => {
     // Add padding around the content to provide room the minimap and compare
-    const scaledXPadding = (containerWidth * MINIMAP_SCALE + containerPadding) / minScale
-    const scaledYPadding = (containerHeight * MINIMAP_SCALE + containerPadding) / minScale
+    const scaledXPadding = (containerWidth * miniMapScale + containerPadding) / minScale
+    const scaledYPadding = (containerHeight * miniMapScale + containerPadding) / minScale
 
     // Add padding around the content to account for the minimap and compare
     const contentScrollExtent: Extent = padExtent(contentExtent, scaledXPadding, scaledYPadding)
@@ -173,7 +186,15 @@ export const ZoomPanSvg = ({
     ]
 
     return maxExtent(contentScrollExtent, containerProjectionExtent)
-  }, [defaultZoom, contentExtent, containerWidth, containerHeight, containerPadding, minScale])
+  }, [
+    defaultZoom,
+    contentExtent,
+    containerWidth,
+    containerHeight,
+    containerPadding,
+    minScale,
+    miniMapScale,
+  ])
 
   /* ---- STATE ---- */
 
@@ -357,6 +378,26 @@ export const ZoomPanSvg = ({
   // On first load
   useEffect(handleMountRef, [handleMountRef, svgD3Selection, zoomD3Selection])
 
+  // Open on the focus node at a readable scale, once per content (size) and focus node
+  const focusOnContent = () => {
+    if (!focusNodeId || !focusMinScale) return
+    const focusNode = positionedNodes.find((node) => node.id === focusNodeId)
+    if (!focusNode || fitContentScale >= focusMinScale) {
+      fitContent()
+      return
+    }
+    centerOnPositionedNode(focusNodeId, Math.min(focusMinScale, maxScale))
+  }
+  const focusOnContentRef = useCallbackRef(focusOnContent)
+  useEffect(focusOnContentRef, [
+    focusOnContentRef,
+    svgD3Selection,
+    zoomD3Selection,
+    focusNodeId,
+    contentWidth,
+    contentHeight,
+  ])
+
   // Resize of container or content
   useEffect(handleResizeRef, [handleResizeRef, translateExtent])
 
@@ -383,7 +424,7 @@ export const ZoomPanSvg = ({
         contentWidth={contentWidth}
         contentHeight={contentHeight}
         zoomTransform={currentZoomState}
-        miniMapScale={MINIMAP_SCALE}
+        miniMapScale={miniMapScale}
         placement={miniMapPlacement}
         backgroundColor={theme.palette.background.paper}
       >
