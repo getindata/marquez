@@ -110,6 +110,14 @@ describe('the table drawer with full facets (converted)', () => {
     expect(code.style.background).toBe('rgb(30, 30, 30)') // #1E1E1E
   })
 
+  it('colours NOT in the target DDL as a keyword, as editors do', () => {
+    renderDrawer(FULL)
+    fireEvent.click(tab('Databricks target'))
+    const code = screen.getByTestId('ddl-code')
+    expect(within(code).getAllByText('NOT')[0].style.color).toBe('rgb(86, 156, 214)')
+    expect(within(code).getAllByText('DECIMAL')[0].style.color).toBe('rgb(78, 201, 176)')
+  })
+
   it('switches to the Databricks target and to side by side', () => {
     renderDrawer(FULL)
     fireEvent.click(tab('Databricks target'))

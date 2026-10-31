@@ -14,6 +14,7 @@ import plsql from 'react-syntax-highlighter/dist/cjs/languages/prism/plsql'
 /** Column types: Prism's SQL grammars leave most of them plain, editors colour them as types. */
 const TYPES =
   /\b(?:BFILE|BIGINT|BINARY|BINARY_DOUBLE|BINARY_FLOAT|BLOB|BOOLEAN|CHAR|CLOB|DATE|DECIMAL|DOUBLE|FLOAT|INT|INTEGER|LONG|NCHAR|NCLOB|NUMBER|NUMERIC|NVARCHAR2|RAW|REAL|ROWID|SMALLINT|STRING|TIMESTAMP|TIMESTAMP_NTZ|TINYINT|UROWID|VARCHAR|VARCHAR2|XMLTYPE)\b/i
+const WORD_OPERATORS = /\b(?:AND|BETWEEN|DIV|ILIKE|IN|IS|LIKE|NOT|OR|REGEXP|RLIKE|XOR)\b/i
 
 // refractor registers a grammar function by its displayName
 const oracleSql = Object.assign(
@@ -22,6 +23,10 @@ const oracleSql = Object.assign(
     ;['sql', 'plsql'].forEach((lang) =>
       Prism.languages.insertBefore(lang, 'keyword', { 'class-name': TYPES })
     )
+    // Prism's SQL grammar calls NOT, AND, IN… operators; editors colour them as keywords
+    Prism.languages.insertBefore('sql', 'keyword', {
+      'word-operator': { pattern: WORD_OPERATORS, alias: 'keyword' },
+    })
   },
   { displayName: 'plsql', aliases: [] as string[] }
 )
