@@ -1,0 +1,11 @@
+{
+  "name": "marquez-web-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runtime dependencies of the web image's release stage (setupProxy.js); installed with npm ci from the lockfile beside it",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "express": "4.22.3",
+    "http-proxy-middleware": "2.0.11"
+  }
+}

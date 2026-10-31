@@ -17,7 +17,9 @@ RUN npm run build
 FROM node:24-alpine AS release
 WORKDIR /usr/src/app
 
-RUN npm install express@4 http-proxy-middleware@2
+# setupProxy.js's runtime deps, exact versions from the runtime lockfile.
+COPY docker/runtime/package.json docker/runtime/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 
 COPY --from=deps /usr/src/app/dist ./dist
 COPY setupProxy.js ./
