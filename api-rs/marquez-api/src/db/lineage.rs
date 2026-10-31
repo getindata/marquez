@@ -7,6 +7,8 @@
 //! inputs for downstream jobs. The `job_versions_io_mapping` table tracks
 //! which datasets are inputs/outputs for each job version.
 
+use std::collections::HashMap;
+
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -320,6 +322,69 @@ pub async fn get_job_from_input_or_output(
     .fetch_optional(pool)
     .await?;
     Ok(row.map(|(uuid,)| uuid))
+}
+
+/// Get the job facets of each job's current version, for all given job
+/// UUIDs in one query.
+///
+/// Each `job_facets` row holds one facet as `{name: value}`. Rows of the
+/// job's `current_version_uuid` are merged into one flat object by facet
+/// name, the newest `lineage_event_time` winning — the rule
+/// `MapperUtils.toFacetsOrNull()` applies to job and dataset facets.
+/// Jobs without facets are absent from the map.
+pub async fn get_current_job_facets(
+    pool: &PgPool,
+    job_uuids: &[Uuid],
+) -> Result<HashMap<Uuid, serde_json::Value>, sqlx::Error> {
+    let rows: Vec<(Uuid, serde_json::Value)> = sqlx::query_as(
+        "SELECT kv.job_uuid, jsonb_object_agg(kv.key, kv.value) AS facets \
+         FROM ( \
+             SELECT DISTINCT ON (j.uuid, kv2.key) j.uuid AS job_uuid, kv2.key, kv2.value \
+             FROM jobs j \
+             INNER JOIN job_facets jf ON jf.job_version_uuid = j.current_version_uuid \
+             CROSS JOIN LATERAL jsonb_each(jf.facet) AS kv2(key, value) \
+             WHERE j.uuid = ANY($1) \
+             ORDER BY j.uuid, kv2.key, jf.lineage_event_time DESC, jf.created_at DESC \
+         ) kv \
+         GROUP BY kv.job_uuid",
+    )
+    .bind(job_uuids)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().collect())
+}
+
+/// Get the dataset facets of each dataset's current version, for all given
+/// dataset UUIDs in one query.
+///
+/// Same rows and rule as the dataset endpoint
+/// (`GET /namespaces/{ns}/datasets/{name}`): `dataset_facets` of the
+/// dataset's `current_version_uuid`, types `dataset`, `unknown` and `input`,
+/// merged into one flat object by facet name, the newest
+/// `lineage_event_time` winning. Datasets without facets are absent from
+/// the map.
+pub async fn get_current_dataset_facets(
+    pool: &PgPool,
+    dataset_uuids: &[Uuid],
+) -> Result<HashMap<Uuid, serde_json::Value>, sqlx::Error> {
+    let rows: Vec<(Uuid, serde_json::Value)> = sqlx::query_as(
+        "SELECT kv.dataset_uuid, jsonb_object_agg(kv.key, kv.value) AS facets \
+         FROM ( \
+             SELECT DISTINCT ON (d.uuid, kv2.key) d.uuid AS dataset_uuid, kv2.key, kv2.value \
+             FROM datasets d \
+             INNER JOIN dataset_facets df ON df.dataset_version_uuid = d.current_version_uuid \
+             CROSS JOIN LATERAL jsonb_each(df.facet) AS kv2(key, value) \
+             WHERE d.uuid = ANY($1) \
+               AND LOWER(df.type) IN ('dataset', 'unknown', 'input') \
+               AND df.facet IS NOT NULL \
+             ORDER BY d.uuid, kv2.key, df.lineage_event_time DESC, df.created_at DESC \
+         ) kv \
+         GROUP BY kv.dataset_uuid",
+    )
+    .bind(dataset_uuids)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().collect())
 }
 
 /// Get the current (latest) runs with facets for the given job UUIDs.

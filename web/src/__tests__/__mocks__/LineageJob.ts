@@ -43,6 +43,7 @@ export const lineageJob: LineageJob = {
   ],
   "location": null,
   "description": null,
+  "facets": {},
   "latestRun": {
     "id": "ffba2c14-4170-48da-bec3-ab5fd4ec9a3f",
     "createdAt": "2020-02-22T22:42:42Z",
