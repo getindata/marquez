@@ -10,10 +10,14 @@ import {
   TARGET_DDL,
   graphWith,
   migration,
+  neighbourGraph,
+  neighbourNode,
 } from './tableDrawer.fixtures'
 import { DESIGN_CATALOG } from '../layers/fixtures'
 import { EDITOR_COLORS } from '../../routes/table-level/drawer/DdlCode'
 import { LayerCatalog, parseLayerCatalog } from '../../layers'
+import { LineageGraph } from '../../types/api'
+import { LineageNode } from '../../types/lineage'
 import { MemoryRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { SCHEMES, SchemeContext, SchemeName } from '../../theme'
@@ -42,21 +46,27 @@ const FULL = { ...AXIS_DDL, ...SCHEMA, ...LAYERS, ...migration('applied') }
 const NO_MIGRATION = { ...AXIS_DDL, ...SCHEMA, ...LAYERS, axisStatus: { state: 'lineage' } }
 const NO_TARGET = { ...AXIS_DDL, ...SCHEMA, ...LAYERS, ...migration('will_apply') }
 
-const renderDrawer = (facets: object, scheme: SchemeName = 'dark') => {
-  const { node, lineage } = graphWith(facets)
+/** The graph's URL the drawer opens on: its query must survive every link the drawer follows. */
+const GRAPH_URL =
+  '/lineage/dataset/oracle/dw.fact_sales?theme=xebia&layers=wave&depth=3&tableLevelNode=dataset%3Aoracle%3Adw.fact_sales'
+
+const renderNode = (node: LineageNode, lineage: LineageGraph, scheme: SchemeName = 'dark') => {
   const onClose = jest.fn()
   const utils = render(
-    <SchemeContext.Provider value={{ scheme, tokens: SCHEMES[scheme], setScheme: () => undefined }}>
-      <TableDrawer
-        node={node}
-        lineage={lineage}
-        catalog={catalog}
-        onClose={onClose}
-        lineageTab={<div data-testid='stock-dataset-drawer' />}
-      />
-    </SchemeContext.Provider>
+    <MemoryRouter initialEntries={[GRAPH_URL]}>
+      <SchemeContext.Provider
+        value={{ scheme, tokens: SCHEMES[scheme], setScheme: () => undefined }}
+      >
+        <TableDrawer node={node} lineage={lineage} catalog={catalog} onClose={onClose} />
+      </SchemeContext.Provider>
+    </MemoryRouter>
   )
   return { ...utils, onClose }
+}
+
+const renderDrawer = (facets: object, scheme: SchemeName = 'dark') => {
+  const { node, lineage } = graphWith(facets)
+  return renderNode(node, lineage, scheme)
 }
 
 const tab = (name: string) => screen.getByRole('tab', { name })
@@ -176,12 +186,12 @@ describe('the table drawer with full facets (converted)', () => {
     expect(screen.getByText('Databricks type')).toBeTruthy()
   })
 
-  it('keeps the stock drawer as the Lineage tab and the raw facets', () => {
+  it('shows the raw facets, and only them, as Facets (raw)', () => {
     renderDrawer(FULL)
-    fireEvent.click(tab('Lineage'))
-    expect(screen.getByTestId('stock-dataset-drawer')).toBeTruthy()
     fireEvent.click(tab('Facets (raw)'))
     expect(screen.getByText(/axisMigration/)).toBeTruthy()
+    expect(screen.queryByTestId('lineage-tab')).toBeNull()
+    expect(screen.queryByTestId('stock-dataset-drawer')).toBeNull()
   })
 
   it('closes from its ✕', () => {
@@ -255,6 +265,91 @@ describe('editor colours follow the scheme', () => {
   })
 })
 
+describe('the Lineage tab', () => {
+  const openLineage = (name: string) => {
+    const lineage = neighbourGraph()
+    const utils = renderNode(neighbourNode(lineage, name), lineage)
+    fireEvent.click(tab('Lineage'))
+    return utils
+  }
+  const side = (title: 'upstream' | 'downstream') => within(screen.getByTestId(`lineage-${title}`))
+  const hrefOf = (el: HTMLElement) => el.getAttribute('href') as string
+  const queryOf = (el: HTMLElement) => new URLSearchParams(hrefOf(el).split('?')[1])
+
+  it('lists the real writers upstream, each with what it reads, without the own table job', () => {
+    openLineage('dw.fact_sales')
+    const up = side('upstream')
+    expect(up.getAllByTestId('lineage-job').map((a) => a.textContent)).toEqual(['etl.load_sales'])
+    expect(up.queryByTestId('lineage-direct')).toBeNull()
+    expect(up.getAllByTestId('lineage-dataset').map((a) => a.textContent)).toEqual([
+      'stg.channels',
+      'stg.sales_raw',
+    ])
+    expect(up.getByText('PL/SQL procedure')).toBeTruthy()
+  })
+
+  it('shows the job type icon, wave chip and orchestrator badge as on the cards', () => {
+    openLineage('dw.fact_sales')
+    const up = side('upstream')
+    expect(up.getByTestId('lineage-row').querySelector('[data-glyph="plsql"]')).toBeTruthy()
+    expect(up.getByTestId('wave-chip').textContent).toBe('Wave 1')
+    expect(up.getByTestId('orchestrator-badge')).toBeTruthy()
+  })
+
+  it('lists the readers downstream, each with what it writes, and collapses a view’s own DDL', () => {
+    openLineage('dw.fact_sales')
+    const down = side('downstream')
+    expect(down.getAllByTestId('lineage-job').map((a) => a.textContent)).toEqual([
+      'rpt.refresh_daily',
+    ])
+    expect(down.getByTestId('lineage-direct').textContent).toBe('Read by the DDL of')
+    expect(down.getAllByTestId('lineage-dataset').map((a) => a.textContent)).toEqual([
+      'rpt.v_sales',
+      'rpt.daily_sales',
+    ])
+    expect(screen.queryByText('axis.layers')).toBeNull()
+  })
+
+  it('shows a view’s own DDL upstream as the tables it reads', () => {
+    openLineage('rpt.v_sales')
+    const up = side('upstream')
+    expect(up.queryByTestId('lineage-job')).toBeNull()
+    expect(up.getByTestId('lineage-direct').textContent).toBe('Its own DDL reads')
+    expect(up.getByTestId('lineage-dataset').textContent).toBe('dw.fact_sales')
+    expect(side('downstream').getByTestId('lineage-empty').textContent).toBe('No downstream jobs')
+  })
+
+  it('says so in one muted line when a side is empty', () => {
+    openLineage('stg.sales_raw')
+    expect(side('upstream').getByTestId('lineage-empty').textContent).toBe('No upstream jobs')
+    expect(side('upstream').queryByTestId('lineage-row')).toBeNull()
+    expect(side('downstream').getByTestId('lineage-job').textContent).toBe('etl.load_sales')
+  })
+
+  it('links each job and dataset to its node in the graph, keeping the query', () => {
+    openLineage('dw.fact_sales')
+    const writer = side('upstream').getByTestId('lineage-job')
+    expect(hrefOf(writer).split('?')[0]).toBe('/lineage/job/oracle/etl.load_sales')
+    const input = side('upstream').getAllByTestId('lineage-dataset')[1]
+    expect(hrefOf(input).split('?')[0]).toBe('/lineage/dataset/oracle/stg.sales_raw')
+    for (const link of [writer, input]) {
+      const q = queryOf(link)
+      expect(q.get('theme')).toBe('xebia')
+      expect(q.get('layers')).toBe('wave')
+      expect(q.get('depth')).toBe('3')
+    }
+    expect(queryOf(writer).get('tableLevelNode')).toBe('job:oracle:etl.load_sales')
+    expect(queryOf(input).get('tableLevelNode')).toBe('dataset:oracle:stg.sales_raw')
+  })
+
+  it('links to the stock column-level view of the table, in the same scheme', () => {
+    openLineage('dw.fact_sales')
+    expect(hrefOf(screen.getByTestId('column-lineage'))).toBe(
+      '/datasets/column-level/oracle/dw.fact_sales?theme=xebia'
+    )
+  })
+})
+
 describe('the table-level drawer host', () => {
   const host = (selected: string) => {
     const { lineage } = graphWith(FULL)
@@ -271,6 +366,13 @@ describe('the table-level drawer host', () => {
   it('opens the table drawer for a dataset', () => {
     host('dataset:oracle:dw.fact_sales')
     expect(screen.getByTestId('table-drawer')).toBeTruthy()
+  })
+
+  it('shows its own lineage, not the stock dataset drawer, as the Lineage tab', () => {
+    host('dataset:oracle:dw.fact_sales')
+    fireEvent.click(screen.getByRole('tab', { name: 'Lineage' }))
+    expect(screen.getByTestId('lineage-tab')).toBeTruthy()
+    expect(screen.queryByTestId('stock-dataset-drawer')).toBeNull()
   })
 
   it('keeps the stock drawer for a job', () => {

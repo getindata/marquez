@@ -2,13 +2,12 @@ import * as Redux from 'redux'
 import { Box } from '@mui/system'
 import { IState } from '../../store/reducers'
 import { LayerCatalog } from '../../layers'
-import { LineageDataset, LineageJob } from '../../types/lineage'
 import { LineageGraph } from '../../types/api'
+import { LineageJob } from '../../types/lineage'
 import { TableDrawer } from './drawer/TableDrawer'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 import { useSearchParams } from 'react-router-dom'
-import DatasetDetailPage from '../../components/datasets/DatasetDetailPage'
 import JobDetailPage from '../../components/jobs/JobDetailPage'
 import React from 'react'
 
@@ -45,7 +44,6 @@ const TableLevelDrawer = ({
         lineage={lineageGraph}
         catalog={catalog}
         onClose={onClose}
-        lineageTab={<DatasetDetailPage lineageDataset={node.data as LineageDataset} />}
       />
     )
   }

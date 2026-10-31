@@ -138,3 +138,97 @@ export const graphWith = (facets: object): { node: LineageNode; lineage: Lineage
     },
   }
 }
+
+const dataset = (name: string, inEdges: string[], outEdges: string[]): LineageNode => ({
+  id: `dataset:oracle:${name}`,
+  type: 'DATASET',
+  data: {
+    id: { namespace: 'oracle', name },
+    type: 'DB_TABLE',
+    name,
+    namespace: 'oracle',
+    fields: [],
+    facets: {},
+  } as unknown as LineageDataset,
+  inEdges: inEdges.map((j) => ({
+    origin: `job:oracle:${j}`,
+    destination: `dataset:oracle:${name}`,
+  })),
+  outEdges: outEdges.map((j) => ({
+    origin: `dataset:oracle:${name}`,
+    destination: `job:oracle:${j}`,
+  })),
+})
+
+const job = (
+  name: string,
+  facets: object,
+  inputs: string[],
+  outputs: string[],
+  /** Inputs the job names that are past the fetched depth: no node, no edge. */
+  unfetchedInputs: string[] = []
+): LineageNode => ({
+  id: `job:oracle:${name}`,
+  type: 'JOB',
+  data: {
+    id: { namespace: 'oracle', name },
+    type: 'BATCH',
+    name,
+    namespace: 'oracle',
+    latestRun: null,
+    inputs: [...inputs, ...unfetchedInputs].map((d) => ({ namespace: 'oracle', name: d })),
+    outputs: outputs.map((d) => ({ namespace: 'oracle', name: d })),
+    facets,
+  } as unknown as LineageJob,
+  inEdges: inputs.map((d) => ({
+    origin: `dataset:oracle:${d}`,
+    destination: `job:oracle:${name}`,
+  })),
+  outEdges: outputs.map((d) => ({
+    origin: `job:oracle:${name}`,
+    destination: `dataset:oracle:${d}`,
+  })),
+})
+
+const jobType = (integration: string, type: string) => ({
+  jobType: { processingType: 'BATCH', integration, jobType: type },
+})
+
+/**
+ * `dw.fact_sales` with its neighbours: its own table DDL job (no inputs), a procedure writer
+ * run by Airflow in wave 1 that reads `stg.sales_raw` and `stg.channels` (the latter past the
+ * fetched depth), a downstream procedure writing `rpt.daily_sales`, the view `rpt.v_sales`
+ * whose own DDL reads it, and the Axis layer catalog job, which is never shown.
+ */
+export const neighbourGraph = (): LineageGraph => ({
+  graph: [
+    dataset(
+      'dw.fact_sales',
+      ['dw.fact_sales', 'etl.load_sales'],
+      ['rpt.refresh_daily', 'rpt.v_sales', 'axis.layers']
+    ),
+    dataset('stg.sales_raw', [], ['etl.load_sales']),
+    dataset('rpt.daily_sales', ['rpt.refresh_daily'], []),
+    dataset('rpt.v_sales', ['rpt.v_sales'], []),
+    job('dw.fact_sales', jobType('ORACLE', 'table'), [], ['dw.fact_sales']),
+    job(
+      'etl.load_sales',
+      { ...jobType('ORACLE', 'procedure'), ...axisLayers({ wave: 1, orchestrator: 'airflow' }) },
+      ['stg.sales_raw'],
+      ['dw.fact_sales'],
+      ['stg.channels']
+    ),
+    job(
+      'rpt.refresh_daily',
+      jobType('ORACLE', 'procedure'),
+      ['dw.fact_sales'],
+      ['rpt.daily_sales']
+    ),
+    job('rpt.v_sales', jobType('ORACLE', 'view'), ['dw.fact_sales'], ['rpt.v_sales']),
+    job('axis.layers', jobType('AXIS', 'catalog'), ['dw.fact_sales'], []),
+  ],
+})
+
+/** A node of `neighbourGraph` by dataset name. */
+export const neighbourNode = (lineage: LineageGraph, name: string): LineageNode =>
+  lineage.graph.find((n) => n.id === `dataset:oracle:${name}`) as LineageNode

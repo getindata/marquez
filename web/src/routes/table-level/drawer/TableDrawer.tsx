@@ -17,9 +17,11 @@ import {
 import { AxisTokens, useAxisTokens } from '../../../theme'
 import { DdlCode } from './DdlCode'
 import { FillChip, MeterRow, tailFit } from '../cardParts'
-import { LayerCatalog, NodeMarks, resolveNodeMarks } from '../../../layers'
+import { LayerCatalog, NodeMarks } from '../../../layers'
 import { LineageDataset, LineageJob, LineageNode } from '../../../types/lineage'
 import { LineageGraph } from '../../../types/api'
+import { LineageTab } from './LineageTab'
+import { allMarks } from './marks'
 import { datasetTypeOf } from '../TableLineageDatasetNode'
 import { isOwnDatasetJob } from '../collapse'
 import MqJsonView from '../../../components/core/json-view/MqJsonView'
@@ -27,8 +29,9 @@ import React, { CSSProperties, ReactNode, useEffect, useState } from 'react'
 
 /**
  * The table drawer of design §7.4: the table's facts, its DDL highlighted (source, target, side
- * by side) with the migration rules for the target, the column type mapping, the stock drawer
- * (Lineage) and the raw facets. A missing `axisDdl` or `axisMigration` hides its sections.
+ * by side) with the migration rules for the target, the column type mapping, the table's
+ * upstream and downstream jobs (Lineage) and the raw facets. A missing `axisDdl` or
+ * `axisMigration` hides its sections.
  */
 
 export const DRAWER_WIDTH = 640
@@ -58,14 +61,6 @@ export const writersOf = (node: LineageNode, lineage: LineageGraph): string[] =>
     .filter((n): n is LineageNode => !!n && n.type === 'JOB' && !isOwnDatasetJob(n, byId))
     .map((n) => (n.data as LineageJob).name)
 }
-
-/** The header's marks: every catalog layer, whatever the graph's Layers panel has on. */
-const allMarks = (catalog: LayerCatalog | null, facets: unknown): NodeMarks =>
-  resolveNodeMarks(
-    { catalog, active: new Set(catalog ? catalog.layers.map((l) => l.id) : []) },
-    'dataset',
-    facets
-  )
 
 const copyText = (text: string) => {
   try {
@@ -553,11 +548,9 @@ export interface TableDrawerProps {
   lineage: LineageGraph
   catalog: LayerCatalog | null
   onClose: () => void
-  /** The stock dataset drawer, for the Lineage tab. */
-  lineageTab: ReactNode
 }
 
-export const TableDrawer = ({ node, lineage, catalog, onClose, lineageTab }: TableDrawerProps) => {
+export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProps) => {
   const t = useAxisTokens()
   const dataset = node.data as LineageDataset
   const facets = dataset.facets
@@ -568,7 +561,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose, lineageTab }: Tab
   const tabs: Tab[] = [...(hasDdlTab ? ['ddl' as Tab] : []), 'columns', 'lineage', 'facets']
   const [tab, setTab] = useState<Tab>(tabs[0])
   const [view, setView] = useState<DdlView>('source')
-  const marks = allMarks(catalog, facets)
+  const marks = allMarks(catalog, 'dataset', facets)
   const axisStatus = (facets as Record<string, any> | undefined)?.axisStatus?.state
   const status = migration?.status || (typeof axisStatus === 'string' ? axisStatus : '')
   const wide = tab === 'ddl' && view === 'side' && !!ddl && !!migration?.targetDdl
@@ -634,7 +627,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose, lineageTab }: Tab
           <DdlTab source={ddl} migration={migration} view={view} onView={setView} />
         )}
         {tab === 'columns' && <ColumnsTab columns={columns} migration={migration} />}
-        {tab === 'lineage' && <div style={{ margin: '0 -18px' }}>{lineageTab}</div>}
+        {tab === 'lineage' && <LineageTab node={node} lineage={lineage} catalog={catalog} />}
         {tab === 'facets' && <MqJsonView data={(facets as object) ?? {}} />}
       </div>
     </div>
