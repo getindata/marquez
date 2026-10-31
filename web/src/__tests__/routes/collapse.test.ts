@@ -3,9 +3,11 @@
 
 import { LineageGraph } from '../../types/api'
 import {
+  FULL_GRAPH_DEPTH,
   collapseOwnJobs,
   collapsedLineage,
   hopDistances,
+  lineageFetchDepth,
   trimToDepth,
 } from '../../routes/table-level/collapse'
 
@@ -210,5 +212,46 @@ describe('depth on the collapsed graph', () => {
   it('keeps every node within a large depth', () => {
     const { graph } = collapsedLineage(chain, 'dataset:oracle:a', 10)
     expect(graph.graph).toHaveLength(7) // 9 raw nodes less the two hidden jobs
+  })
+})
+
+describe('Full graph', () => {
+  // a -> [p1] -> b -> [p2] -> c -> [p3] -> d: three dataset steps
+  const steps = graphOf(
+    [
+      { id: 'd:a', type: 'DATASET' },
+      { id: 'j:p1', type: 'JOB', jobType: 'procedure' },
+      { id: 'd:b', type: 'DATASET' },
+      { id: 'j:p2', type: 'JOB', jobType: 'procedure' },
+      { id: 'd:c', type: 'DATASET' },
+      { id: 'j:p3', type: 'JOB', jobType: 'procedure' },
+      { id: 'd:d', type: 'DATASET' },
+    ],
+    [
+      ['d:a', 'j:p1'],
+      ['j:p1', 'd:b'],
+      ['d:b', 'j:p2'],
+      ['j:p2', 'd:c'],
+      ['d:c', 'j:p3'],
+      ['j:p3', 'd:d'],
+    ]
+  )
+
+  it('shows every node at Depth 1 with Full graph on', () => {
+    expect(collapsedLineage(steps, 'dataset:oracle:a', 1, true).graph.graph).toHaveLength(7)
+  })
+
+  it('cuts to Depth 1 with Full graph off', () => {
+    expect(ids(collapsedLineage(steps, 'dataset:oracle:a', 1, false).graph)).toEqual([
+      'dataset:oracle:a',
+      'dataset:oracle:b',
+      'job:oracle:p1',
+    ])
+  })
+
+  it('asks the API for its own bound in Full graph, one hop more than shown otherwise', () => {
+    expect(lineageFetchDepth(1, true)).toBe(FULL_GRAPH_DEPTH)
+    expect(lineageFetchDepth(30, true)).toBe(31)
+    expect(lineageFetchDepth(1, false)).toBe(2)
   })
 })

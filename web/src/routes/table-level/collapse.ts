@@ -130,11 +130,27 @@ export const trimToDepth = (lineage: LineageGraph, start: string, depth: number)
 }
 
 /**
- * The table-level graph the UI draws: own jobs collapsed, then cut to `depth` hops from the
- * selected node. A selected own job stands for its dataset.
+ * How deep Full graph asks the lineage API to go: a server-side bound on the traversal, apart
+ * from the Depth control (which Full graph ignores). 20 job hops covers every graph seen so far.
  */
-export const collapsedLineage = (lineage: LineageGraph, selectedId: string, depth: number) => {
+export const FULL_GRAPH_DEPTH = 20
+
+/** The depth the UI asks the API for: one hop more than shown, or the Full graph bound. */
+export const lineageFetchDepth = (depth: number, isFull: boolean) =>
+  isFull ? Math.max(FULL_GRAPH_DEPTH, depth + 1) : depth + 1
+
+/**
+ * The table-level graph the UI draws: own jobs collapsed, then cut to `depth` hops from the
+ * selected node, except in Full graph, which draws everything fetched. A selected own job
+ * stands for its dataset.
+ */
+export const collapsedLineage = (
+  lineage: LineageGraph,
+  selectedId: string,
+  depth: number,
+  isFull = false
+) => {
   const { graph, hidden } = collapseOwnJobs(lineage)
   const selected = hidden.get(selectedId) ?? selectedId
-  return { graph: trimToDepth(graph, selected, depth), selected, hidden }
+  return { graph: isFull ? graph : trimToDepth(graph, selected, depth), selected, hidden }
 }

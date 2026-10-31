@@ -22,7 +22,7 @@ import { TABLE_LEVEL_LAYOUT_OPTIONS, createElkNodes } from './layout'
 import { TableLevelNodeData, tableLevelNodeRenderer } from './nodes'
 import { TableZoomControls } from './TableZoomControls'
 import { bindActionCreators } from 'redux'
-import { collapsedLineage } from './collapse'
+import { collapsedLineage, lineageFetchDepth } from './collapse'
 import { connect } from 'react-redux'
 import { fetchLineage } from '../../store/actionCreators'
 import { useAxisTokens } from '../../theme'
@@ -102,10 +102,10 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
 
   useEffect(() => {
     if (name && namespace && nodeType) {
-      // one hop more than shown: depth is then cut on the collapsed graph (collapse.ts)
-      fetchLineage(nodeType as JobOrDataset, namespace, name, depth + 1)
+      // one hop more than shown, cut on the collapsed graph; Full graph asks for its own bound
+      fetchLineage(nodeType as JobOrDataset, namespace, name, lineageFetchDepth(depth, isFull))
     }
-  }, [name, namespace, depth])
+  }, [name, namespace, depth, isFull])
 
   const setGraphControls = useCallbackRef((zoomControls) => {
     graphControls.current = zoomControls
@@ -113,7 +113,7 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
 
   // each table's or view's own job is hidden, its inputs drawn straight into the dataset
   const view = lineage
-    ? collapsedLineage(lineage, `${nodeType}:${namespace}:${name}`, depth)
+    ? collapsedLineage(lineage, `${nodeType}:${namespace}:${name}`, depth, isFull)
     : undefined
   const selectedId = view?.selected ?? `${nodeType}:${namespace}:${name}`
 
