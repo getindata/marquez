@@ -1,7 +1,7 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { monoChars, tailFit } from '../../routes/table-level/cardParts'
+import { monoChars, nodeUrl, tailFit } from '../../routes/table-level/cardParts'
 
 describe('tailFit', () => {
   it('keeps a name that fits', () => {
@@ -29,5 +29,23 @@ describe('monoChars', () => {
     expect(monoChars(142, 12)).toBe(19)
     expect(monoChars(112, 11.5)).toBe(16)
     expect(monoChars(1, 12)).toBe(4)
+  })
+})
+
+describe('nodeUrl', () => {
+  it('keeps the current query, theme and layers included, and replaces tableLevelNode', () => {
+    const current = new URLSearchParams(
+      'theme=xebia&layers=wave,heat&depth=4&isFull=true&tableLevelNode=dataset:oracle:old'
+    )
+    const url = nodeUrl('job', 'oracle', 'etl.load sales', 'job:oracle:etl.load sales', current)
+    const [path, query] = url.split('?')
+    expect(path).toBe('/lineage/job/oracle/etl.load%20sales')
+    const params = new URLSearchParams(query)
+    expect(params.get('theme')).toBe('xebia')
+    expect(params.get('layers')).toBe('wave,heat')
+    expect(params.get('depth')).toBe('4')
+    expect(params.get('isFull')).toBe('true')
+    expect(params.getAll('tableLevelNode')).toEqual(['job:oracle:etl.load sales'])
+    expect(current.get('tableLevelNode')).toBe('dataset:oracle:old') // not mutated
   })
 })

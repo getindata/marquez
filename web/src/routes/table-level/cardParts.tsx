@@ -1,8 +1,8 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { LAYERS_PARAM, NodeMarks, mix } from '../../layers'
 import { NODE_OVERHANG } from './sizes'
+import { NodeMarks, mix } from '../../layers'
 import { useAxisTokens } from '../../theme'
 import React, { CSSProperties, ReactNode } from 'react'
 
@@ -156,7 +156,10 @@ export const MeterRow = ({
   )
 }
 
-/** A node's lineage URL; keeps the viewer's layer choice so the next graph looks the same. */
+/**
+ * A node's lineage URL. It keeps the current query (layers, theme, depth…) so the next graph
+ * looks the same, and only points `tableLevelNode` at the node.
+ */
 export const nodeUrl = (
   kind: 'job' | 'dataset',
   namespace: string,
@@ -164,9 +167,8 @@ export const nodeUrl = (
   nodeId: string,
   searchParams: URLSearchParams
 ) => {
-  const params = new URLSearchParams({ tableLevelNode: nodeId })
-  const layers = searchParams.get(LAYERS_PARAM)
-  if (layers !== null) params.set(LAYERS_PARAM, layers)
+  const params = new URLSearchParams(searchParams)
+  params.set('tableLevelNode', nodeId)
   return `/lineage/${kind}/${encodeURIComponent(namespace)}/${encodeURIComponent(
     name
   )}?${params.toString()}`
