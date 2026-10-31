@@ -76,7 +76,7 @@ const Sidenav: React.FC<SidenavProps> = () => {
             width={'100%'}
             sx={{ backgroundColor: t.night, borderBottom: `1px solid ${t.line}` }}
           >
-            <Link to='/' aria-label='Axis lineage home' style={{ display: 'flex' }}>
+            <Link to='/' aria-label='Xebia Axis lineage home' style={{ display: 'flex' }}>
               <AxisSymbol size={32} light={t.symbolDots} />
             </Link>
           </Box>

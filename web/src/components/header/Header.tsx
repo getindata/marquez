@@ -12,8 +12,8 @@ import React, { ReactElement } from 'react'
 import Search from '../search/Search'
 
 /**
- * Axis lineage branding: "axis lineage", the colour scheme switch, the stock search and
- * "by Xebia" on the right.
+ * Xebia Axis lineage branding: the "Xebia Axis" wordmark and a muted "lineage" (the Axis symbol
+ * sits before them in the side navigation's cell), the colour scheme switch and the stock search.
  */
 const Header = (): ReactElement => {
   const theme = createTheme(useTheme())
@@ -32,7 +32,7 @@ const Header = (): ReactElement => {
         width: `calc(100% - ${DRAWER_WIDTH + 1}px)`,
       }}
     >
-      <Toolbar disableGutters sx={{ gap: 2, pr: 3 }}>
+      <Toolbar disableGutters sx={{ gap: 2, pr: 3 }} data-testid='axis-header'>
         <Box
           component={Link}
           to='/'
@@ -47,7 +47,7 @@ const Header = (): ReactElement => {
           }}
         >
           <Box component='span' sx={{ fontWeight: 600, fontSize: 20, letterSpacing: '.2px' }}>
-            axis
+            Xebia Axis
           </Box>
           <Box component='span' sx={{ color: t.muted, fontSize: 14 }}>
             lineage
@@ -63,12 +63,6 @@ const Header = (): ReactElement => {
           }}
         >
           <Search />
-        </Box>
-        <Box sx={{ color: t.muted, fontSize: 13, whiteSpace: 'nowrap' }}>
-          by{' '}
-          <Box component='b' sx={{ color: t.text }}>
-            Xebia
-          </Box>
         </Box>
       </Toolbar>
     </AppBar>

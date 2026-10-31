@@ -43,7 +43,7 @@ const store = createStore(
 
 sagaMiddleware.run(rootSaga)
 
-const TITLE = 'Axis lineage'
+const TITLE = 'Xebia Axis lineage'
 
 const App = (): ReactElement => {
   return (

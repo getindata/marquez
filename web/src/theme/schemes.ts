@@ -3,7 +3,7 @@
 
 /**
  * The Axis lineage UI's colour schemes. Dark is the default: neutral greys with one calm blue
- * accent. Light is the same approach on a light background. Xebia is for demo recordings only
+ * accent. Light is the same approach on a light background. Xebia is for demo recordings
  * (night band, magenta, velvet). Data colours (wave legend colours, the heat-map scale, vendor
  * marks) belong to the data and never change with the scheme.
  */
@@ -15,7 +15,7 @@ export const SCHEME_NAMES: SchemeName[] = ['dark', 'light', 'xebia']
 export const SCHEME_LABELS: Record<SchemeName, string> = {
   dark: 'Dark',
   light: 'Light',
-  xebia: 'Xebia (demo)',
+  xebia: 'Xebia',
 }
 
 export interface AxisTokens {
@@ -142,7 +142,7 @@ const LIGHT: AxisTokens = {
   mono: MONO,
 }
 
-/** Xebia (demo): the approved v16 mockup's look. */
+/** Xebia: the approved v16 mockup's look, for demo recordings. */
 const XEBIA: AxisTokens = {
   scheme: 'xebia',
   mode: 'dark',

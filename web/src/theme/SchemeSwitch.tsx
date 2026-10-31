@@ -5,7 +5,7 @@ import { SCHEME_LABELS, SCHEME_NAMES } from './schemes'
 import { useScheme } from './SchemeContext'
 import React from 'react'
 
-/** The header's segmented control: Dark · Light · Xebia (demo). */
+/** The header's segmented control: Dark · Light · Xebia. */
 export const SchemeSwitch = () => {
   const { scheme, tokens: t, setScheme } = useScheme()
   return (

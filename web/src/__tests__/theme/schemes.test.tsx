@@ -98,6 +98,14 @@ describe('SchemeProvider', () => {
     expect(document.documentElement.style.getPropertyValue('--axis-canvas')).toBe('#1e2127')
   })
 
+  it('labels the switch Dark · Light · Xebia', () => {
+    const { getByTestId } = app('/')
+    const labels = Array.from(getByTestId('scheme-switch').querySelectorAll('button')).map(
+      (b) => b.textContent
+    )
+    expect(labels).toEqual(['Dark', 'Light', 'Xebia'])
+  })
+
   it('remembers a choice from the switch', () => {
     const { getByTestId, container } = app('/')
     act(() => {
