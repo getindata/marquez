@@ -92,6 +92,24 @@ describe('collapseOwnJobs', () => {
     ])
   })
 
+  it('keeps a self-edge for a view that reads itself', () => {
+    const g = graphOf(
+      [
+        { id: 'd:v', type: 'DATASET' },
+        { id: 'j:v', type: 'JOB', jobType: 'view' },
+      ],
+      [
+        ['d:v', 'j:v'],
+        ['j:v', 'd:v'],
+      ]
+    )
+    const { graph, hidden } = collapseOwnJobs(g)
+    expect(hidden.get('job:oracle:v')).toBe('dataset:oracle:v')
+    expect(ids(graph)).toEqual(['dataset:oracle:v'])
+    expect(edgesOf(graph)).toEqual(['dataset:oracle:v -> dataset:oracle:v'])
+    expect(graph.graph[0].inEdges).toHaveLength(1)
+  })
+
   it('keeps real jobs, and own-type jobs whose output is not their own dataset', () => {
     const g = graphOf(
       [

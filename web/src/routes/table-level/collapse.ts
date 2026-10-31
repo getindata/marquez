@@ -37,7 +37,8 @@ export interface CollapsedGraph {
 
 /**
  * Hides each dataset's own job and draws its inputs straight into the dataset: a view keeps an
- * edge from every table it reads. Real jobs (procedures, packages, triggers, dbt…) stay.
+ * edge from every table it reads, and one that reads itself keeps a self-edge. Real jobs
+ * (procedures, packages, triggers, dbt…) stay.
  */
 export const collapseOwnJobs = (lineage: LineageGraph): CollapsedGraph => {
   const byId = new Map(lineage.graph.map((n) => [n.id, n]))
@@ -54,11 +55,10 @@ export const collapseOwnJobs = (lineage: LineageGraph): CollapsedGraph => {
       const target = hidden.get(e.destination)
       if (hidden.has(e.origin)) return // the hidden job's own output edge
       if (target !== undefined) {
-        // an input of a hidden job flows straight into its dataset
-        if (e.origin !== target) {
-          const direct = { origin: e.origin, destination: target }
-          edges.set(key(direct), direct)
-        }
+        // an input of a hidden job flows straight into its dataset; a view that reads itself
+        // keeps that as a self-edge, so no lineage is lost
+        const direct = { origin: e.origin, destination: target }
+        edges.set(key(direct), direct)
         return
       }
       edges.set(key(e), e)
