@@ -39,6 +39,26 @@ export const NodeFrame = ({
   </foreignObject>
 )
 
+/**
+ * A long name cut from the front so its end, the part that tells nodes apart, stays visible:
+ * `freepdb1.bl_3nf.table.ce_customers` in 19 characters is `…table.ce_customers`. It cuts at a
+ * dot when the rest still fits, else mid-word. Names that fit are unchanged.
+ */
+export const tailFit = (name: string, maxChars: number): string => {
+  if (name.length <= maxChars) return name
+  const room = Math.max(1, maxChars - 1) // one character for the ellipsis
+  const start = name.length - room
+  // the first part boundary (just after a dot) inside the room, else a hard cut
+  for (let k = start; k < name.length; k++) {
+    if (name[k - 1] === '.') return '…' + name.slice(k)
+  }
+  return '…' + name.slice(start)
+}
+
+/** How many monospace characters fit in `width` px at `fontSize` px (about 0.6 em each). */
+export const monoChars = (width: number, fontSize: number) =>
+  Math.max(4, Math.floor(width / (fontSize * 0.6)))
+
 export const ellipsis: CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',

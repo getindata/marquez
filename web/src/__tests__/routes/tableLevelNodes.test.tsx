@@ -203,6 +203,28 @@ describe('job node', () => {
     expect(q(container, 'job-card').style.border).toBe('1px solid #34274a')
   })
 
+  it('shows the end of a long name, the full name in the tooltip', () => {
+    const facets = { jobType: { integration: 'ORACLE', jobType: 'procedure' } }
+    const long = {
+      ...job(facets),
+      name: 'freepdb1.bl_cl_2nd.package.pkg_etl_insert_products.insert_table_products',
+    }
+    const node = {
+      id: 'job:oracle:long',
+      kind: 'JOB' as const,
+      width: 180,
+      height: 52,
+      bottomLeftCorner: { x: 0, y: 0 },
+      data: { job: long, jobType: jobTypeOf(facets), marks: { markers: [] } },
+    }
+    const { container } = inRouter(
+      <svg>
+        <TableLineageJobNode node={node} />
+      </svg>
+    )
+    expect(q(container, 'job-card').textContent).toContain('…_table_products')
+  })
+
   it('draws a dbt-ol event with the dbt glyph', () => {
     const { container } = renderJob(NO_LAYERS, {
       jobType: { processingType: 'BATCH', integration: 'DBT', jobType: 'MODEL' },

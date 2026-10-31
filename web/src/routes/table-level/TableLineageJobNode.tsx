@@ -7,7 +7,9 @@ import {
   NodeFrame,
   TooltipLine,
   ellipsis,
+  monoChars,
   nodeUrl,
+  tailFit,
 } from './cardParts'
 import { PositionedNode } from '../../../libs/graph'
 import { TableLineageJobNodeData } from './nodes'
@@ -141,7 +143,9 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
                   fontWeight: 600,
                 }}
               >
-                <span style={ellipsis}>{job.name}</span>
+                <span style={ellipsis}>
+                  {tailFit(job.name, monoChars(node.width - 68 - marks.markers.length * 12, 11.5))}
+                </span>
                 {marks.markers.map((m) => (
                   <span
                     key={m.layerId}

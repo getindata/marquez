@@ -40,6 +40,9 @@ interface DispatchProps {
 
 type ColumnLevelProps = StateProps & DispatchProps
 
+/** The strip on the right that holds the stock zoom controls (40px wide, 8px margins). */
+const ZOOM_GUTTER = 56
+
 const zoomInFactor = 1.5
 const zoomOutFactor = 1 / zoomInFactor
 
@@ -180,23 +183,27 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
             onClose={closeLayers}
           />
         )}
-        <ParentSize>
-          {(parent) => (
-            <Graph<JobOrDataset, TableLevelNodeData>
-              id='column-level-graph'
-              backgroundColor={AXIS.canvas}
-              dotGridColor={AXIS.dotGrid}
-              height={parent.height}
-              width={parent.width}
-              nodes={nodes}
-              edges={edges}
-              direction='right'
-              layoutOptions={TABLE_LEVEL_LAYOUT_OPTIONS}
-              nodeRenderers={tableLevelNodeRenderer}
-              setZoomPanControls={setGraphControls}
-            />
-          )}
-        </ParentSize>
+        {/* the graph stops short of the zoom controls' strip, so fit-to-view never puts a
+            node under them */}
+        <Box position='absolute' top={0} bottom={0} left={0} right={`${ZOOM_GUTTER}px`}>
+          <ParentSize>
+            {(parent) => (
+              <Graph<JobOrDataset, TableLevelNodeData>
+                id='column-level-graph'
+                backgroundColor={AXIS.canvas}
+                dotGridColor={AXIS.dotGrid}
+                height={parent.height}
+                width={parent.width}
+                nodes={nodes}
+                edges={edges}
+                direction='right'
+                layoutOptions={TABLE_LEVEL_LAYOUT_OPTIONS}
+                nodeRenderers={tableLevelNodeRenderer}
+                setZoomPanControls={setGraphControls}
+              />
+            )}
+          </ParentSize>
+        </Box>
       </Box>
     </>
   )

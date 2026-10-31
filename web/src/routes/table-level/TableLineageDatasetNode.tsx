@@ -16,7 +16,9 @@ import {
   NodeFrame,
   TooltipLine,
   ellipsis,
+  monoChars,
   nodeUrl,
+  tailFit,
 } from './cardParts'
 import { IState } from '../../store/reducers'
 import { LineageDataset } from '../../types/lineage'
@@ -212,7 +214,15 @@ export const TableLineageDatasetNode = ({
                     gap: 5,
                   }}
                 >
-                  <span style={ellipsis}>{lineageDataset.name}</span>
+                  <span style={ellipsis}>
+                    {tailFit(
+                      lineageDataset.name,
+                      monoChars(
+                        node.width - 48 - (marks.dot ? 20 : 0) - marks.markers.length * 12,
+                        12
+                      )
+                    )}
+                  </span>
                   {marks.markers.map((m) => (
                     <span
                       key={m.layerId}
