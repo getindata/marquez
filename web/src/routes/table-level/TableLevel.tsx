@@ -27,9 +27,10 @@ import { connect } from 'react-redux'
 import { fetchLineage } from '../../store/actionCreators'
 import { useAxisTokens } from '../../theme'
 import { useCallbackRef } from '../../helpers/hooks'
+import { useLineageFetch } from './useLineageFetch'
 import { useParams, useSearchParams } from 'react-router-dom'
 import ParentSize from '@visx/responsive/lib/components/ParentSize'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import TableLevelDrawer from './TableLevelDrawer'
 
 interface StateProps {
@@ -100,12 +101,9 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
   )
   const closeLayers = useCallback(() => setLayersOpen(false), [])
 
-  useEffect(() => {
-    if (name && namespace && nodeType) {
-      // one hop more than shown, cut on the collapsed graph; Full graph asks for its own bound
-      fetchLineage(nodeType as JobOrDataset, namespace, name, lineageFetchDepth(depth, isFull))
-    }
-  }, [name, namespace, depth, isFull])
+  // one hop more than shown, cut on the collapsed graph; Full graph asks for at least
+  // FULL_GRAPH_DEPTH hops, more if Depth asks for more
+  useLineageFetch(fetchLineage, nodeType, namespace, name, lineageFetchDepth(depth, isFull))
 
   const setGraphControls = useCallbackRef((zoomControls) => {
     graphControls.current = zoomControls

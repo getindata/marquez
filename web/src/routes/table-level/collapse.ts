@@ -130,12 +130,15 @@ export const trimToDepth = (lineage: LineageGraph, start: string, depth: number)
 }
 
 /**
- * How deep Full graph asks the lineage API to go: a server-side bound on the traversal, apart
- * from the Depth control (which Full graph ignores). 20 job hops covers every graph seen so far.
+ * How deep Full graph asks the lineage API to go: at least 20 job hops, more if Depth asks for
+ * more, so Full graph never shows less than Depth would. 20 covers every graph seen so far.
  */
 export const FULL_GRAPH_DEPTH = 20
 
-/** The depth the UI asks the API for: one hop more than shown, or the Full graph bound. */
+/**
+ * The depth the UI asks the API for: one hop more than shown; in Full graph at least
+ * FULL_GRAPH_DEPTH, more if Depth asks for more.
+ */
 export const lineageFetchDepth = (depth: number, isFull: boolean) =>
   isFull ? Math.max(FULL_GRAPH_DEPTH, depth + 1) : depth + 1
 
