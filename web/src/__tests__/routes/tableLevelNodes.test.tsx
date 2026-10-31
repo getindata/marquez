@@ -14,6 +14,7 @@ import {
 import { LineageDataset, LineageJob } from '../../types/lineage'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { TableLineageDatasetNode } from '../../routes/table-level/TableLineageDatasetNode'
+import { SCHEMES } from '../../theme/schemes'
 import { render } from '@testing-library/react'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
 
@@ -142,7 +143,7 @@ describe('dataset node', () => {
 
   it('draws no layer marks with every layer off, and a neutral border', () => {
     const { container } = renderDataset(ALL_OFF, DATASET_FACETS)
-    expect(q(container, 'dataset-card').style.border).toBe('1px solid #34274a')
+    expect(q(container, 'dataset-card').style.border).toBe(`1px solid ${SCHEMES.dark.line}`)
     ;['wave-chip', 'wave-accent', 'heat-dot', 'meter-row'].forEach((id) =>
       expect(q(container, id)).toBeNull()
     )
@@ -200,7 +201,7 @@ describe('job node', () => {
     expect(q(container, 'job-type-caption').textContent).toBe('job')
     expect(q(container, 'orchestrator-badge')).toBeNull()
     expect(q(container, 'wave-chip')).toBeNull()
-    expect(q(container, 'job-card').style.border).toBe('1px solid #34274a')
+    expect(q(container, 'job-card').style.border).toBe(`1px solid ${SCHEMES.dark.line}`)
   })
 
   it('shows the end of a long name, the full name in the tooltip', () => {
@@ -242,6 +243,6 @@ describe('job node', () => {
     const card = q(container, 'job-card')
     expect(card.dataset.selected).toBe('true')
     expect(card.style.border).toBe('1px solid #3fa7d6')
-    expect(card.style.boxShadow).toContain('0 0 0 5px #E331D0')
+    expect(card.style.boxShadow).toContain(`0 0 0 5px ${SCHEMES.dark.accent}`)
   })
 })

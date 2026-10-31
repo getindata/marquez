@@ -7,11 +7,12 @@ import SVG from 'react-inlinesvg'
 import { Link, useLocation } from 'react-router-dom'
 import Box from '@mui/material/Box'
 
-import { AXIS_NIGHT, DRAWER_WIDTH, HEADER_HEIGHT } from '../../helpers/theme'
 import { AxisSymbol } from '../header/AxisSymbol'
+import { DRAWER_WIDTH, HEADER_HEIGHT } from '../../helpers/theme'
 import { Divider, Drawer, createTheme } from '@mui/material'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCogs, faDatabase } from '@fortawesome/free-solid-svg-icons'
+import { useAxisTokens } from '../../theme'
 import MqIconButton from '../core/icon-button/MqIconButton'
 
 // for i18n
@@ -31,6 +32,7 @@ const Sidenav: React.FC<SidenavProps> = () => {
     i18next.changeLanguage(lng)
   }
   const theme = createTheme(useTheme())
+  const t = useAxisTokens()
 
   const location = useLocation()
 
@@ -72,10 +74,10 @@ const Sidenav: React.FC<SidenavProps> = () => {
             justifyContent={'center'}
             height={HEADER_HEIGHT}
             width={'100%'}
-            sx={{ backgroundColor: AXIS_NIGHT, borderBottom: '1px solid #34274a' }}
+            sx={{ backgroundColor: t.night, borderBottom: `1px solid ${t.line}` }}
           >
             <Link to='/' aria-label='Axis lineage home' style={{ display: 'flex' }}>
-              <AxisSymbol size={32} />
+              <AxisSymbol size={32} light={t.symbolDots} />
             </Link>
           </Box>
           <Divider sx={{ my: 1 }} />

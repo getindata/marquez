@@ -1,4 +1,3 @@
-import { AXIS, SELECTED_RING, mix } from '../../layers'
 import { ChevronLeft } from '@mui/icons-material'
 import {
   DATASET_HEADER_HEIGHT,
@@ -26,6 +25,8 @@ import { PositionedNode } from '../../../libs/graph'
 import { TableLineageDatasetNodeData } from './nodes'
 import { connect } from 'react-redux'
 import { datasetFields } from './layout'
+import { mix } from '../../layers'
+import { selectedRing, useAxisTokens } from '../../theme'
 
 import * as Redux from 'redux'
 import { bindActionCreators } from 'redux'
@@ -67,6 +68,7 @@ export const TableLineageDatasetNode = ({
   dataset,
   fetchDataset,
 }: TableLineageDatasetNodeProps & StateProps & Partial<DispatchProps>) => {
+  const t = useAxisTokens()
   const navigate = useNavigate()
   const { nodeType, name, namespace } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -86,7 +88,7 @@ export const TableLineageDatasetNode = ({
         width={node.width}
         height={node.height}
         rx={8}
-        fill={wave ? wave.color : AXIS.cardHeader}
+        fill={wave ? wave.color : t.cardHeader}
       />
     )
   }
@@ -145,7 +147,7 @@ export const TableLineageDatasetNode = ({
   const fields = datasetFields(lineageDataset)
   const shownFields = showFields ? fields.slice(0, MAX_FIELD_ROWS) : []
   const moreFields = showFields ? fields.length - shownFields.length : 0
-  const rowLine = `1px solid ${AXIS.rowLine}`
+  const rowLine = `1px solid ${t.rowLine}`
 
   return (
     <g>
@@ -159,12 +161,12 @@ export const TableLineageDatasetNode = ({
             width: node.width,
             height: node.height,
             boxSizing: 'border-box',
-            border: `1px solid ${wave ? wave.color : AXIS.line}`,
+            border: `1px solid ${wave ? wave.color : t.line}`,
             borderRadius: 8,
-            background: AXIS.card,
-            boxShadow: isSelected ? SELECTED_RING : '0 6px 18px rgba(0,0,0,.35)',
-            color: AXIS.text,
-            fontFamily: AXIS.font,
+            background: t.card,
+            boxShadow: isSelected ? selectedRing(t) : t.cardShadow,
+            color: t.text,
+            fontFamily: t.font,
             fontSize: 13,
             lineHeight: 1.35,
             overflow: 'hidden',
@@ -181,8 +183,8 @@ export const TableLineageDatasetNode = ({
               alignItems: 'center',
               gap: 8,
               padding: '6px 10px 6px 12px',
-              background: wave ? mix(wave.color, AXIS.cardHeader, 0.22) : AXIS.cardHeader,
-              borderBottom: showFields || marks.meter ? `1px solid ${AXIS.line}` : 'none',
+              background: wave ? mix(wave.color, t.cardHeader, 0.22) : t.cardHeader,
+              borderBottom: showFields || marks.meter ? `1px solid ${t.line}` : 'none',
             }}
           >
             {wave && <FillAccent color={wave.color} radius='8px 0 0 0' />}
@@ -209,7 +211,7 @@ export const TableLineageDatasetNode = ({
                 <div
                   style={{
                     ...ellipsis,
-                    fontFamily: AXIS.mono,
+                    fontFamily: t.mono,
                     fontWeight: 600,
                     fontSize: 12,
                     paddingRight: 12,
@@ -236,7 +238,7 @@ export const TableLineageDatasetNode = ({
                         width: 7,
                         height: 7,
                         transform: 'rotate(45deg)',
-                        background: AXIS.magenta,
+                        background: t.accent,
                       }}
                     />
                   ))}
@@ -246,7 +248,7 @@ export const TableLineageDatasetNode = ({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  color: AXIS.muted,
+                  color: t.muted,
                   fontSize: 10.5,
                   minWidth: 0,
                 }}
@@ -268,7 +270,7 @@ export const TableLineageDatasetNode = ({
                   width: 14,
                   height: 14,
                   p: 0,
-                  color: AXIS.muted,
+                  color: t.muted,
                   opacity: 0.6,
                   '&:hover': { opacity: 1 },
                 }}
@@ -290,7 +292,7 @@ export const TableLineageDatasetNode = ({
               style={{
                 height: METER_ROW_HEIGHT,
                 padding: '0 10px 0 12px',
-                background: AXIS.meterRow,
+                background: t.meterRow,
                 borderBottom: shownFields.length ? rowLine : 'none',
               }}
             />
@@ -317,8 +319,8 @@ export const TableLineageDatasetNode = ({
                   style={{
                     ...ellipsis,
                     fontStyle: 'normal',
-                    color: AXIS.muted,
-                    fontFamily: AXIS.mono,
+                    color: t.muted,
+                    fontFamily: t.mono,
                     fontSize: 10,
                   }}
                 >
@@ -334,7 +336,7 @@ export const TableLineageDatasetNode = ({
                 height: MORE_ROW_HEIGHT,
                 boxSizing: 'border-box',
                 textAlign: 'center',
-                color: AXIS.muted,
+                color: t.muted,
                 fontSize: 10,
                 lineHeight: `${MORE_ROW_HEIGHT - 1}px`,
                 borderTop: rowLine,

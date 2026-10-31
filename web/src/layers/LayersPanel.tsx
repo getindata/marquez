@@ -1,10 +1,10 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { AXIS } from './palette'
 import { HEAT_GRADIENT } from './colorScale'
 import { LayerDefinition, LayerSlot } from './catalog'
 import { OrchestratorBadge } from './VendorMarks'
+import { useAxisTokens } from '../theme'
 import Box from '@mui/material/Box'
 import React, { useEffect } from 'react'
 
@@ -23,7 +23,8 @@ const appliesText = (layer: LayerDefinition) =>
   layer.appliesTo.length > 1 ? 'tables and jobs' : layer.appliesTo[0] === 'job' ? 'jobs' : 'tables'
 
 const Legend = ({ layer }: { layer: LayerDefinition }) => {
-  const small = { fontSize: 10.5, color: AXIS.muted }
+  const t = useAxisTokens()
+  const small = { fontSize: 10.5, color: t.muted }
   switch (layer.kind) {
     case 'category':
       return (
@@ -96,6 +97,7 @@ interface LayersPanelProps {
 
 /** The floating Layers card over the graph's right edge; Escape closes it. */
 export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelProps) => {
+  const t = useAxisTokens()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -119,12 +121,12 @@ export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelPr
         zIndex: 5,
         overflow: 'auto',
         p: '14px',
-        background: AXIS.panel,
-        border: `1px solid ${AXIS.line}`,
+        background: t.panel,
+        border: `1px solid ${t.line}`,
         borderRadius: '10px',
-        boxShadow: '0 12px 32px rgba(0,0,0,.5)',
-        color: AXIS.text,
-        fontFamily: AXIS.font,
+        boxShadow: t.panelShadow,
+        color: t.text,
+        fontFamily: t.font,
         fontSize: 13,
       }}
     >
@@ -135,7 +137,7 @@ export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelPr
           fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '.8px',
-          color: AXIS.muted,
+          color: t.muted,
         }}
       >
         Layers
@@ -144,11 +146,11 @@ export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelPr
         <Box
           key={layer.id}
           sx={{
-            border: `1px solid ${AXIS.line}`,
+            border: `1px solid ${t.line}`,
             borderRadius: '8px',
             p: '9px 10px',
             mb: '9px',
-            background: AXIS.panelEntry,
+            background: t.panelEntry,
           }}
         >
           <Box
@@ -161,12 +163,12 @@ export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelPr
               checked={active.has(layer.id)}
               onChange={() => onToggle(layer.id)}
               data-layer={layer.id}
-              style={{ accentColor: AXIS.magenta, width: 15, height: 15, margin: 0 }}
+              style={{ accentColor: t.accent, width: 15, height: 15, margin: 0 }}
             />
             {layer.title}
             <Box
               component='small'
-              sx={{ ml: 'auto', fontWeight: 400, color: AXIS.muted, fontSize: 10 }}
+              sx={{ ml: 'auto', fontWeight: 400, color: t.muted, fontSize: 10 }}
             >
               {SLOT_TEXT[layer.slot]}
             </Box>

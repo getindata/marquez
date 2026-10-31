@@ -4,6 +4,7 @@
 import { DESIGN_CATALOG, axisLayers } from '../layers/fixtures'
 import { LayerCatalog, LayerView, parseLayerCatalog } from '../../layers'
 import { LineageGraph } from '../../types/api'
+import { SCHEMES } from '../../theme/schemes'
 import {
   TABLE_LEVEL_LAYOUT_OPTIONS,
   createElkNodes,
@@ -111,7 +112,10 @@ describe('createElkNodes', () => {
   })
 
   it('draws every edge dotted and animated, magenta on the selected node flow', () => {
-    const { edges } = createElkNodes(graph, SELECTED, false, true, null)
+    const { edges } = createElkNodes(graph, SELECTED, false, true, null, undefined, {
+      highlight: '#E331D0',
+      muted: '#8f80a8',
+    })
     const byId = Object.fromEntries(edges.map((e) => [e.id, e]))
     expect(byId['dataset:oracle:src:job:oracle:load'].color).toBe('#E331D0')
     expect(byId['dataset:oracle:fact:job:oracle:report'].color).toBe('#E331D0')
@@ -124,6 +128,13 @@ describe('createElkNodes', () => {
         isAnimated: true,
       })
     )
+  })
+
+  it('colours edges in the default Dark scheme unless told otherwise', () => {
+    const { edges } = createElkNodes(graph, SELECTED, false, true, null)
+    const byId = Object.fromEntries(edges.map((e) => [e.id, e]))
+    expect(byId['dataset:oracle:src:job:oracle:load'].color).toBe(SCHEMES.dark.accent)
+    expect(byId['dataset:oracle:src:job:oracle:side'].color).toBe(SCHEMES.dark.edge)
   })
 
   it('asks ELK for layer sweep, Brandes-Koepf placement and greedy cycle breaking', () => {

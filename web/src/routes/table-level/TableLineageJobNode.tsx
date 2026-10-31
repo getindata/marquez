@@ -1,4 +1,3 @@
-import { AXIS, JobTypeTile, OrchestratorBadge, SELECTED_RING, mix } from '../../layers'
 import { Divider } from '@mui/material'
 import {
   FillAccent,
@@ -11,10 +10,12 @@ import {
   nodeUrl,
   tailFit,
 } from './cardParts'
+import { JobTypeTile, OrchestratorBadge, mix } from '../../layers'
 import { PositionedNode } from '../../../libs/graph'
 import { TableLineageJobNodeData } from './nodes'
 import { formatUpdatedAt } from '../../helpers'
 import { runStateColor } from '../../helpers/nodes'
+import { selectedRing, useAxisTokens } from '../../theme'
 import { theme } from '../../helpers/theme'
 import { truncateTextFront } from '../../helpers/text'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -28,6 +29,7 @@ interface TableLineageJobNodeProps {
 }
 
 const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
+  const t = useAxisTokens()
   const navigate = useNavigate()
   const { nodeType, name, namespace } = useParams()
   const [searchParams] = useSearchParams()
@@ -43,7 +45,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
         width={node.width}
         height={node.height}
         rx={10}
-        fill={wave ? mix(wave.color, AXIS.jobBg, 0.5) : AXIS.jobBg}
+        fill={wave ? mix(wave.color, t.jobBg, 0.5) : t.jobBg}
       />
     )
   }
@@ -84,7 +86,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
             color={latestRun?.state ? runStateColor(latestRun.state) : theme.palette.secondary.main}
           />
           {latestRun && (
-            <span style={{ fontFamily: AXIS.mono, fontSize: 12 }}>
+            <span style={{ fontFamily: t.mono, fontSize: 12 }}>
               {formatUpdatedAt(latestRun.endedAt || latestRun.updatedAt)}
             </span>
           )}
@@ -110,12 +112,12 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
               alignItems: 'center',
               gap: 10,
               padding: '8px 10px 8px 12px',
-              border: `1px solid ${wave ? wave.color : AXIS.line}`,
+              border: `1px solid ${wave ? wave.color : t.line}`,
               borderRadius: 10,
-              background: wave ? mix(wave.color, AXIS.jobBg, 0.16) : AXIS.jobBg,
-              boxShadow: isSelected ? SELECTED_RING : 'none',
-              color: AXIS.text,
-              fontFamily: AXIS.font,
+              background: wave ? mix(wave.color, t.jobBg, 0.16) : t.jobBg,
+              boxShadow: isSelected ? selectedRing(t) : 'none',
+              color: t.text,
+              fontFamily: t.font,
               fontSize: 13,
               lineHeight: 1.35,
               cursor: 'pointer',
@@ -124,12 +126,12 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
           >
             {wave && <FillAccent color={wave.color} radius='10px 0 0 10px' />}
             <span style={{ position: 'relative', width: 34, height: 34, flex: 'none' }}>
-              <JobTypeTile glyph={jobType.glyph} />
+              <JobTypeTile glyph={jobType.glyph} neutral={{ tile: t.cardHeader, glyph: t.muted }} />
               {marks.badge && (
                 <span style={{ position: 'absolute', right: -7, bottom: -7 }}>
                   <OrchestratorBadge
                     icon={marks.badge.icon}
-                    ring={wave ? mix(wave.color, AXIS.jobBg, 0.16) : AXIS.jobBg}
+                    ring={wave ? mix(wave.color, t.jobBg, 0.16) : t.jobBg}
                   />
                 </span>
               )}
@@ -140,7 +142,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 5,
-                  fontFamily: AXIS.mono,
+                  fontFamily: t.mono,
                   fontSize: 11.5,
                   fontWeight: 600,
                 }}
@@ -157,7 +159,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
                       width: 7,
                       height: 7,
                       transform: 'rotate(45deg)',
-                      background: AXIS.magenta,
+                      background: t.accent,
                     }}
                   />
                 ))}
@@ -165,7 +167,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                 <span
                   data-testid='job-type-caption'
-                  style={{ ...ellipsis, color: AXIS.muted, fontSize: 10.5 }}
+                  style={{ ...ellipsis, color: t.muted, fontSize: 10.5 }}
                 >
                   {jobType.caption}
                 </span>

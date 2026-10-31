@@ -1,10 +1,11 @@
 import { Edge, Node as ElkNode } from '../../../libs/graph'
 import { LineageGraph } from '../../types/api'
 
-import { AXIS, LayerView, NO_LAYERS, jobTypeOf, resolveNodeMarks } from '../../layers'
 import { DATASET_WIDTH, JOB_WIDTH, datasetHeight, jobHeight } from './sizes'
 import { JobOrDataset, LineageDataset, LineageJob, LineageNode } from '../../types/lineage'
+import { LayerView, NO_LAYERS, jobTypeOf, resolveNodeMarks } from '../../layers'
 import { Nullable } from '../../types/util/Nullable'
+import { SCHEMES } from '../../theme/schemes'
 import { TableLevelNodeData } from './nodes'
 
 /**
@@ -97,17 +98,18 @@ export const TABLE_LEVEL_LAYOUT_OPTIONS: Record<string, string> = {
   'elk.spacing.nodeNode': '28',
 }
 
-/** Edges on the selected node's up- or downstream flow are magenta, the rest grey. */
-export const EDGE_HIGHLIGHT = AXIS.magenta
-export const EDGE_MUTED = AXIS.edge
-
 export const createElkNodes = (
   lineageGraph: LineageGraph,
   currentGraphNode: Nullable<string>,
   isCompact: boolean,
   isFull: boolean,
   collapsedNodes: Nullable<string>,
-  layerView: LayerView = NO_LAYERS
+  layerView: LayerView = NO_LAYERS,
+  /** Edges on the selected node's flow in the scheme's accent, the rest muted. */
+  edgeColors: { highlight: string; muted: string } = {
+    highlight: SCHEMES.dark.accent,
+    muted: SCHEMES.dark.edge,
+  }
 ) => {
   const downstreamNodes = findDownstreamNodes(lineageGraph, currentGraphNode)
   const upstreamNodes = findUpstreamNodes(lineageGraph, currentGraphNode)
@@ -139,7 +141,7 @@ export const createElkNodes = (
             id: `${edge.origin}:${edge.destination}`,
             sourceNodeId: edge.origin,
             targetNodeId: edge.destination,
-            color: onFlow ? EDGE_HIGHLIGHT : EDGE_MUTED,
+            color: onFlow ? edgeColors.highlight : edgeColors.muted,
             strokeWidth: 1.8,
             strokeDasharray: '0.1 5',
             animatedStrokeWidth: 5,

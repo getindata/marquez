@@ -1,8 +1,9 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { AXIS, LAYERS_PARAM, NodeMarks, mix } from '../../layers'
+import { LAYERS_PARAM, NodeMarks, mix } from '../../layers'
 import { NODE_OVERHANG } from './sizes'
+import { useAxisTokens } from '../../theme'
 import React, { CSSProperties, ReactNode } from 'react'
 
 /**
@@ -66,24 +67,27 @@ export const ellipsis: CSSProperties = {
 }
 
 /** The wave chip: never wraps, right-aligned, in the wave colour. */
-export const FillChip = ({ fill }: { fill: NonNullable<NodeMarks['fill']> }) => (
-  <span
-    data-testid='wave-chip'
-    style={{
-      flex: 'none',
-      marginLeft: 'auto',
-      fontSize: 10,
-      lineHeight: '14px',
-      padding: '1px 6px',
-      borderRadius: 10,
-      whiteSpace: 'nowrap',
-      color: '#fff',
-      background: mix(fill.color, AXIS.cardHeader, 0.45),
-    }}
-  >
-    {fill.chip}
-  </span>
-)
+export const FillChip = ({ fill }: { fill: NonNullable<NodeMarks['fill']> }) => {
+  const t = useAxisTokens()
+  return (
+    <span
+      data-testid='wave-chip'
+      style={{
+        flex: 'none',
+        marginLeft: 'auto',
+        fontSize: 10,
+        lineHeight: '14px',
+        padding: '1px 6px',
+        borderRadius: 10,
+        whiteSpace: 'nowrap',
+        color: t.chipText,
+        background: mix(fill.color, t.chipBase, t.chipWeight),
+      }}
+    >
+      {fill.chip}
+    </span>
+  )
+}
 
 /** The 4px left accent in the wave colour. */
 export const FillAccent = ({ color, radius }: { color: string; radius: string }) => (
@@ -108,46 +112,49 @@ export const MeterRow = ({
 }: {
   meter: NonNullable<NodeMarks['meter']>
   style?: CSSProperties
-}) => (
-  <div
-    data-testid='meter-row'
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      fontSize: 9.5,
-      color: AXIS.muted,
-      boxSizing: 'border-box',
-      ...style,
-    }}
-  >
-    {meter.label}
-    <b
+}) => {
+  const t = useAxisTokens()
+  return (
+    <div
+      data-testid='meter-row'
       style={{
-        position: 'relative',
-        width: 44,
-        height: 4,
-        borderRadius: 2,
-        background: AXIS.track,
-        overflow: 'hidden',
-        display: 'inline-block',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        fontSize: 9.5,
+        color: t.muted,
+        boxSizing: 'border-box',
+        ...style,
       }}
     >
-      <span
+      {meter.label}
+      <b
         style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: `${Math.round(meter.fraction * 100)}%`,
+          position: 'relative',
+          width: 44,
+          height: 4,
           borderRadius: 2,
-          background: meter.color,
+          background: t.track,
+          overflow: 'hidden',
+          display: 'inline-block',
         }}
-      />
-    </b>
-    <em style={{ fontStyle: 'normal', fontWeight: 600, color: meter.color }}>{meter.text}</em>
-  </div>
-)
+      >
+        <span
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: `${Math.round(meter.fraction * 100)}%`,
+            borderRadius: 2,
+            background: meter.color,
+          }}
+        />
+      </b>
+      <em style={{ fontStyle: 'normal', fontWeight: 600, color: meter.color }}>{meter.text}</em>
+    </div>
+  )
+}
 
 /** A node's lineage URL; keeps the viewer's layer choice so the next graph looks the same. */
 export const nodeUrl = (
@@ -166,9 +173,12 @@ export const nodeUrl = (
 }
 
 /** One line of a node tooltip. */
-export const TooltipLine = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 13 }}>
-    <b>{label}</b>
-    <span style={{ fontFamily: AXIS.mono, textAlign: 'right' }}>{children}</span>
-  </div>
-)
+export const TooltipLine = ({ label, children }: { label: string; children: ReactNode }) => {
+  const t = useAxisTokens()
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 13 }}>
+      <b>{label}</b>
+      <span style={{ fontFamily: t.mono, textAlign: 'right' }}>{children}</span>
+    </div>
+  )
+}

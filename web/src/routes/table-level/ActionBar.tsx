@@ -1,5 +1,5 @@
-import { AXIS } from '../../layers'
 import { ArrowBackIosRounded } from '@mui/icons-material'
+import { AxisTokens, useAxisTokens } from '../../theme'
 import { FormControlLabel, Switch } from '@mui/material'
 import { HEADER_HEIGHT } from '../../helpers/theme'
 import { fetchLineage } from '../../store/actionCreators'
@@ -44,17 +44,17 @@ const LayersIcon = () => (
   </svg>
 )
 
-const squareButton = {
+const squareButton = (t: AxisTokens) => ({
   width: 24,
   height: 24,
-  border: `1px solid ${AXIS.line}`,
+  border: `1px solid ${t.line}`,
   borderRadius: '4px',
   background: 'none',
-  color: AXIS.text,
+  color: t.text,
   cursor: 'pointer',
   font: 'inherit',
   padding: 0,
-}
+})
 
 export const ActionBar = ({
   nodeType,
@@ -69,6 +69,7 @@ export const ActionBar = ({
   layersOpen = false,
   onToggleLayers,
 }: ActionBarProps) => {
+  const t = useAxisTokens()
   const { namespace, name } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -81,7 +82,7 @@ export const ActionBar = ({
   }
 
   const switchLabel = (text: string) => (
-    <Box component='span' sx={{ color: AXIS.muted, fontSize: 13 }}>
+    <Box component='span' sx={{ color: t.muted, fontSize: 13 }}>
       {text}
     </Box>
   )
@@ -94,10 +95,10 @@ export const ActionBar = ({
       gap={'18px'}
       px={'18px'}
       sx={{
-        background: AXIS.actionBar,
-        borderBottom: `1px solid ${AXIS.line}`,
-        color: AXIS.text,
-        fontFamily: AXIS.font,
+        background: t.actionBar,
+        borderBottom: `1px solid ${t.line}`,
+        color: t.text,
+        fontFamily: t.font,
         fontSize: 13,
       }}
     >
@@ -105,7 +106,7 @@ export const ActionBar = ({
         <MQTooltip title={`Back to ${nodeType === 'JOB' ? 'jobs' : 'datasets'}`}>
           <IconButton
             size={'small'}
-            sx={{ mr: 1, color: AXIS.muted }}
+            sx={{ mr: 1, color: t.muted }}
             onClick={() => navigate(nodeType === 'JOB' ? '/' : '/datasets')}
           >
             <ArrowBackIosRounded fontSize={'small'} />
@@ -115,7 +116,7 @@ export const ActionBar = ({
           {nodeType === 'JOB' ? 'Jobs' : 'Datasets'}
           <Box
             component='span'
-            sx={{ fontFamily: AXIS.mono, fontWeight: 400, color: AXIS.muted, ml: '6px' }}
+            sx={{ fontFamily: t.mono, fontWeight: 400, color: t.muted, ml: '6px' }}
           >
             {namespace ? truncateText(namespace, 40) : 'unknown namespace'} /{' '}
             {name ? truncateText(name, 60) : 'unknown name'}
@@ -133,11 +134,11 @@ export const ActionBar = ({
             display: 'flex',
             alignItems: 'center',
             gap: 7,
-            border: `1px solid ${layersOpen ? AXIS.magenta : AXIS.line}`,
-            boxShadow: layersOpen ? `0 0 0 1px ${AXIS.magenta}` : 'none',
+            border: `1px solid ${layersOpen ? t.accent : t.line}`,
+            boxShadow: layersOpen ? `0 0 0 1px ${t.accent}` : 'none',
             borderRadius: 6,
             padding: '5px 11px',
-            color: AXIS.text,
+            color: t.text,
             background: 'none',
             font: 'inherit',
             cursor: 'pointer',
@@ -150,7 +151,8 @@ export const ActionBar = ({
             style={{
               fontStyle: 'normal',
               fontSize: 11,
-              background: AXIS.velvet,
+              background: t.accentFill,
+              color: t.accentFillText,
               borderRadius: 9,
               padding: '0 6px',
               minWidth: 18,
@@ -161,12 +163,12 @@ export const ActionBar = ({
           </i>
         </button>
       )}
-      <Box display={'flex'} alignItems={'center'} gap={'6px'} sx={{ color: AXIS.muted }}>
+      <Box display={'flex'} alignItems={'center'} gap={'6px'} sx={{ color: t.muted }}>
         Depth
         <button
           type='button'
           aria-label='Decrease depth'
-          style={squareButton}
+          style={squareButton(t)}
           onClick={() => changeDepth(depth - 1)}
         >
           −
@@ -177,10 +179,10 @@ export const ActionBar = ({
           sx={{
             minWidth: 28,
             textAlign: 'center',
-            border: `1px solid ${AXIS.line}`,
+            border: `1px solid ${t.line}`,
             borderRadius: '4px',
             p: '2px 6px',
-            color: AXIS.text,
+            color: t.text,
             fontWeight: 500,
           }}
         >
@@ -189,7 +191,7 @@ export const ActionBar = ({
         <button
           type='button'
           aria-label='Increase depth'
-          style={squareButton}
+          style={squareButton(t)}
           onClick={() => changeDepth(depth + 1)}
         >
           +

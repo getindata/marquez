@@ -182,7 +182,16 @@ export const OrchestratorBadge = ({
 const RED = '#f26b5b'
 
 /** The 34px job-type tile (design §4.4); `gear` is stock Marquez's job icon on a neutral tile. */
-export const JobTypeTile = ({ glyph, size = 34 }: { glyph: JobGlyph; size?: number }) => {
+export const JobTypeTile = ({
+  glyph,
+  size = 34,
+  neutral = { tile: '#2a2038', glyph: '#9a8fab' },
+}: {
+  glyph: JobGlyph
+  size?: number
+  /** The gear's tile and glyph colours: the stock job icon follows the colour scheme. */
+  neutral?: { tile: string; glyph: string }
+}) => {
   const tile = (fill: string, children: React.ReactNode) => (
     <svg width={size} height={size} viewBox='0 0 34 34' data-glyph={glyph} aria-hidden='true'>
       <rect width='34' height='34' rx='8' fill={fill} />
@@ -288,9 +297,9 @@ export const JobTypeTile = ({ glyph, size = 34 }: { glyph: JobGlyph; size?: numb
     default: {
       const [w, h, , , path] = faCog.icon
       return tile(
-        '#2a2038',
+        neutral.tile,
         <g transform={`translate(9 9) scale(${16 / Math.max(w, h)})`}>
-          <path d={Array.isArray(path) ? path.join(' ') : path} fill='#9a8fab' />
+          <path d={Array.isArray(path) ? path.join(' ') : path} fill={neutral.glyph} />
         </g>
       )
     }

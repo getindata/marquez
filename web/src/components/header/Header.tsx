@@ -1,21 +1,23 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { AXIS_NIGHT, DRAWER_WIDTH } from '../../helpers/theme'
 import { AppBar, Toolbar } from '@mui/material'
+import { DRAWER_WIDTH } from '../../helpers/theme'
 import { Link } from 'react-router-dom'
+import { SchemeSwitch, useAxisTokens } from '../../theme'
 import { createTheme } from '@mui/material/styles'
 import { useTheme } from '@emotion/react'
 import Box from '@mui/material/Box'
 import React, { ReactElement } from 'react'
 import Search from '../search/Search'
 
-const MUTED = '#9a8fab'
-const TEXT = '#ece6f2'
-
-/** Axis lineage branding: "axis lineage", the stock search, "by Xebia" on the right. */
+/**
+ * Axis lineage branding: "axis lineage", the colour scheme switch, the stock search and
+ * "by Xebia" on the right.
+ */
 const Header = (): ReactElement => {
   const theme = createTheme(useTheme())
+  const t = useAxisTokens()
 
   return (
     <AppBar
@@ -23,9 +25,9 @@ const Header = (): ReactElement => {
       elevation={0}
       sx={{
         zIndex: theme.zIndex.drawer + 1,
-        backgroundColor: AXIS_NIGHT,
+        backgroundColor: t.night,
         backgroundImage: 'none',
-        borderBottom: '1px solid #34274a',
+        borderBottom: `1px solid ${t.line}`,
         left: `${DRAWER_WIDTH + 1}px`,
         width: `calc(100% - ${DRAWER_WIDTH + 1}px)`,
       }}
@@ -39,7 +41,7 @@ const Header = (): ReactElement => {
             alignItems: 'baseline',
             gap: '6px',
             pl: 1,
-            color: TEXT,
+            color: t.text,
             textDecoration: 'none',
             whiteSpace: 'nowrap',
           }}
@@ -47,10 +49,11 @@ const Header = (): ReactElement => {
           <Box component='span' sx={{ fontWeight: 600, fontSize: 20, letterSpacing: '.2px' }}>
             axis
           </Box>
-          <Box component='span' sx={{ color: MUTED, fontSize: 14 }}>
+          <Box component='span' sx={{ color: t.muted, fontSize: 14 }}>
             lineage
           </Box>
         </Box>
+        <SchemeSwitch />
         <Box
           flex={1}
           minWidth={0}
@@ -61,9 +64,9 @@ const Header = (): ReactElement => {
         >
           <Search />
         </Box>
-        <Box sx={{ color: MUTED, fontSize: 13, whiteSpace: 'nowrap' }}>
+        <Box sx={{ color: t.muted, fontSize: 13, whiteSpace: 'nowrap' }}>
           by{' '}
-          <Box component='b' sx={{ color: TEXT }}>
+          <Box component='b' sx={{ color: t.text }}>
             Xebia
           </Box>
         </Box>
