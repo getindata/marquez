@@ -68,11 +68,15 @@ export const TableLineageDatasetNode = ({
   fetchDataset,
 }: TableLineageDatasetNodeProps & StateProps & Partial<DispatchProps>) => {
   const navigate = useNavigate()
-  const { name, namespace } = useParams()
+  const { nodeType, name, namespace } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const lineageDataset = node.data.dataset
   const { marks, showFields } = node.data
-  const isSelected = name === lineageDataset.name && namespace === lineageDataset.namespace
+  // the node type counts too: Axis names a table's own job after the table
+  const isSelected =
+    nodeType?.toLowerCase() === 'dataset' &&
+    name === lineageDataset.name &&
+    namespace === lineageDataset.namespace
   const isCollapsed = searchParams.get('collapsedNodes')?.split(',').includes(node.id)
   const wave = marks.fill
 

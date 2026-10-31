@@ -29,10 +29,12 @@ interface TableLineageJobNodeProps {
 
 const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
   const navigate = useNavigate()
-  const { name, namespace } = useParams()
+  const { nodeType, name, namespace } = useParams()
   const [searchParams] = useSearchParams()
   const { job, jobType, marks } = node.data
-  const isSelected = name === job.name && namespace === job.namespace
+  // the node type counts too: Axis names a table's own job after the table
+  const isSelected =
+    nodeType?.toLowerCase() === 'job' && name === job.name && namespace === job.namespace
   const wave = marks.fill
 
   if (isMiniMap) {

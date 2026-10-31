@@ -232,6 +232,11 @@ describe('job node', () => {
     expect(container.querySelector('[data-glyph="dbt"]')).not.toBeNull()
   })
 
+  it('is not selected when a dataset of the same name is (a table and its own job)', () => {
+    const { container } = renderJob(ALL_ON, JOB_FACETS, '/lineage/dataset/oracle/etl.load_sales')
+    expect(q(container, 'job-card').dataset.selected).toBe('false')
+  })
+
   it('keeps the wave border on a selected node and adds a magenta ring outside it', () => {
     const { container } = renderJob(ALL_ON, JOB_FACETS, '/lineage/job/oracle/etl.load_sales')
     const card = q(container, 'job-card')
