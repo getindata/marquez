@@ -1,0 +1,68 @@
+name: Axis images
+
+# Builds the Axis fork's API (Rust, root Dockerfile) and web images,
+# multi-arch, and pushes them to GHCR.
+#   push to axis/main  -> axis-main, sha-<short>
+#   tag v*-axis.*      -> <tag without the leading v>, sha-<short>
+on:
+  push:
+    branches: ['axis/main']
+    tags: ['v*-axis.*']
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: axis-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ghcr.io/getindata/marquez
+            context: .
+            file: Dockerfile
+          - image: ghcr.io/getindata/marquez-web
+            context: web
+            file: web/Dockerfile
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ matrix.image }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=axis-main,enable=${{ github.ref == 'refs/heads/axis/main' }}
+            type=match,pattern=v(.*),group=1
+            type=sha,prefix=sha-,format=short
+
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

@@ -39,8 +39,7 @@ export interface LineageJob {
   latestRun: Nullable<Run>
   parentJobName: Nullable<string>
   parentJobUuid: Nullable<string>
-  /** The job's current job facets (fork API, LAY-4); absent from older APIs. */
-  facets?: Record<string, unknown>
+  facets: object
 }
 
 export interface LineageEdge {
