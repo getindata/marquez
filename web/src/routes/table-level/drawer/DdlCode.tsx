@@ -92,8 +92,54 @@ export const editorPre = (t: AxisTokens): CSSProperties => ({
   overflow: 'auto',
 })
 
+/**
+ * Prism tokenises the whole text synchronously, about 9 s and 20 MB of markup for 1 MB of DDL,
+ * so a DDL over either limit is shown as plain text, cut to the limits; Copy still copies it all.
+ * ponytail: plain text above the limits; a virtualised or worker-side highlighter if large DDL
+ * needs colours.
+ */
+export const LARGE_DDL_CHARS = 200_000
+export const LARGE_DDL_LINES = 5_000
+
+const lineCount = (text: string) => {
+  let n = 1
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) n++
+  return n
+}
+
+const LargeDdl = ({ text }: { text: string }) => {
+  const t = useAxisTokens()
+  const lines = lineCount(text)
+  let shown = text.slice(0, LARGE_DDL_CHARS)
+  const cut = shown.split('\n', LARGE_DDL_LINES).join('\n')
+  shown = cut.length < shown.length ? cut : shown
+  const shownLines = lineCount(shown)
+  return (
+    <div>
+      <div data-testid='ddl-large-note' style={{ marginBottom: 6, fontSize: 12, color: t.muted }}>
+        Highlighting is off for large DDL ({lines.toLocaleString('en-US')} lines,{' '}
+        {Math.round(text.length / 1000).toLocaleString('en-US')} KB)
+        {shown.length < text.length
+          ? `: showing the first ${shownLines.toLocaleString(
+              'en-US'
+            )} lines. Copy copies all of it.`
+          : '.'}
+      </div>
+      <pre
+        data-testid='ddl-plain'
+        style={{ ...editorPre(t), color: EDITOR_COLORS[t.editor].text, whiteSpace: 'pre' }}
+      >
+        {shown}
+      </pre>
+    </div>
+  )
+}
+
 export const DdlCode = ({ text, dialect }: { text: string; dialect: string }) => {
   const t = useAxisTokens()
+  if (text.length > LARGE_DDL_CHARS || lineCount(text) > LARGE_DDL_LINES) {
+    return <LargeDdl text={text} />
+  }
   return (
     <PrismLight
       language={grammarFor(dialect)}

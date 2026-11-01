@@ -251,6 +251,41 @@ describe('the table drawer with no axisMigration (today’s data)', () => {
   })
 })
 
+describe('a large DDL', () => {
+  // 6,000 lines, about 250 KB: over both limits of DdlCode
+  const LARGE_DDL = Array.from(
+    { length: 6000 },
+    (_, i) => `  col_${i} VARCHAR2(30) NOT NULL, -- column number ${i} of a wide table`
+  ).join('\n')
+
+  it('is shown as escaped plain text, not tokenised, with a note', () => {
+    const { container } = renderDrawer({
+      ...SCHEMA,
+      axisDdl: { dialect: 'oracle', language: 'sql', text: `<img src=x>\n${LARGE_DDL}` },
+    })
+    const plain = screen.getByTestId('ddl-plain')
+    expect(container.querySelectorAll('.token').length).toBe(0)
+    expect(container.querySelector('img')).toBeNull()
+    expect(plain.textContent?.startsWith('<img src=x>')).toBe(true)
+    expect(plain.textContent?.split('\n').length).toBeLessThanOrEqual(5000)
+    expect(screen.getByTestId('ddl-large-note').textContent).toContain('Highlighting is off')
+  })
+
+  it('is still copied in full', () => {
+    const writeText = jest.fn(() => Promise.resolve())
+    Object.assign(navigator, { clipboard: { writeText } })
+    renderDrawer({ ...SCHEMA, axisDdl: { dialect: 'oracle', language: 'sql', text: LARGE_DDL } })
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    expect(writeText).toHaveBeenCalledWith(LARGE_DDL)
+  })
+
+  it('under the limits is highlighted as before', () => {
+    const { container } = renderDrawer(FULL)
+    expect(screen.queryByTestId('ddl-large-note')).toBeNull()
+    expect(container.querySelectorAll('.token').length).toBeGreaterThan(0)
+  })
+})
+
 describe('editor colours follow the scheme', () => {
   it.each([
     ['light', 'light-plus', 'rgb(0, 0, 255)', 'rgb(255, 255, 255)'],
