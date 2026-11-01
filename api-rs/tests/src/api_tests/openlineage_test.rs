@@ -2634,3 +2634,83 @@ async fn parent_facet_on_later_event_runs_list_consistent() {
         "count and list must agree: {page}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Latest run of a job
+// ---------------------------------------------------------------------------
+
+/// A job's facets come from its latest run, ranked by `runs.transitioned_at`.
+/// A run created by a single event (a lone COMPLETE, as a catalog push sends)
+/// must get `transitioned_at` on insert, or it ranks below an older run that
+/// happened to get two events, and the job reads that older run's facets.
+#[tokio::test]
+async fn a_run_created_by_one_event_ranks_as_the_latest_run_of_its_job() {
+    let app = TestApp::new().await;
+    let ns = generators::new_namespace_name();
+    let job_name = generators::new_job_name();
+    let catalog = |layers: &[&str]| {
+        json!({
+            "catalog": {
+                "_producer": "test",
+                "_schemaURL": "test",
+                "layers": layers
+            }
+        })
+    };
+
+    // Older run: two events, so its row is updated and gets transitioned_at.
+    let old_run = Uuid::new_v4();
+    for event_time in ["2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"] {
+        let mut event = make_run_event(
+            "COMPLETE",
+            &ns,
+            &job_name,
+            &old_run.to_string(),
+            vec![],
+            vec![],
+            None,
+            Some(catalog(&["wave", "heat"])),
+        );
+        event["eventTime"] = json!(event_time);
+        post_lineage(&app, &event).await;
+    }
+
+    // Newer run of the same job version: one COMPLETE event.
+    let new_run = Uuid::new_v4();
+    let mut event = make_run_event(
+        "COMPLETE",
+        &ns,
+        &job_name,
+        &new_run.to_string(),
+        vec![],
+        vec![],
+        None,
+        Some(catalog(&["wave", "heat", "orchestrator"])),
+    );
+    event["eventTime"] = json!("2024-01-02T00:00:00Z");
+    post_lineage(&app, &event).await;
+
+    let newest = json!(["wave", "heat", "orchestrator"]);
+
+    let job = get_job(&app, &ns, &job_name).await;
+    assert_eq!(job["latestRun"]["id"], json!(new_run.to_string()), "{job}");
+    assert_eq!(job["facets"]["catalog"]["layers"], newest, "{job}");
+
+    let url = format!("{}/api/v1/namespaces/{}/jobs", app.base_url, encode(&ns));
+    let page: Value = app
+        .client
+        .get(&url)
+        .send()
+        .await
+        .expect("list jobs")
+        .json()
+        .await
+        .expect("parse jobs json");
+    let listed = &page["jobs"][0];
+    assert_eq!(
+        listed["latestRun"]["id"],
+        json!(new_run.to_string()),
+        "{page}"
+    );
+    assert_eq!(listed["facets"]["catalog"]["layers"], newest, "{page}");
+}

@@ -100,6 +100,11 @@ const ENRICHED_RUN_LATERAL_SQL: &str = "\
 /// Upsert a run row.
 ///
 /// INSERT INTO runs ... ON CONFLICT(uuid) DO UPDATE. Returns the row.
+///
+/// A run given a state gets `transitioned_at = now` on insert as on update,
+/// as Java `RunDao.upsert` does: the latest-run queries rank runs by
+/// `transitioned_at DESC NULLS LAST`, so a run created by a single event
+/// would otherwise rank below every older run that got a second event.
 pub async fn upsert(
     exec: impl Executor<'_, Database = Postgres>,
     uuid: Uuid,
@@ -125,11 +130,12 @@ pub async fn upsert(
             uuid, created_at, updated_at, job_uuid, job_version_uuid, \
             parent_run_uuid, run_args_uuid, \
             nominal_start_time, nominal_end_time, \
-            current_run_state, started_at, start_run_state_uuid, \
+            current_run_state, transitioned_at, started_at, start_run_state_uuid, \
             ended_at, end_run_state_uuid, \
             namespace_name, job_name, location, external_id\
         ) VALUES (\
-            $1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17\
+            $1, $2, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $9 IS NULL THEN NULL ELSE $2 END, \
+            $10, $11, $12, $13, $14, $15, $16, $17\
         ) \
         ON CONFLICT(uuid) DO UPDATE SET \
             updated_at = EXCLUDED.updated_at, \
