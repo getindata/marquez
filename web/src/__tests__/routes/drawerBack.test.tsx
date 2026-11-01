@@ -13,6 +13,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { createStore } from 'redux'
 import { ActionBar } from '../../routes/table-level/ActionBar'
 import { GraphDrawer } from '../../routes/table-level/GraphDrawer'
+import { LayersPanel } from '../../layers/LayersPanel'
 import { SchemeProvider, useScheme } from '../../theme'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
 
@@ -101,6 +102,13 @@ const Page = () => {
         setIsFull={setIsFull}
       />
       <SchemeButton />
+      {/* the view's real Layers panel, which closes itself on Escape */}
+      <LayersPanel
+        layers={catalog.layers}
+        active={new Set<string>()}
+        onToggle={() => undefined}
+        onClose={() => undefined}
+      />
       <button type='button' onClick={() => navigate(-1)}>
         browser back
       </button>
@@ -218,6 +226,17 @@ describe('Back in the drawer', () => {
     })
     expect(search().get('tableLevelNode')).toBeNull()
     expectQueryKept()
+  })
+
+  it('stays open on an Escape meant for the Layers panel', async () => {
+    renderPage()
+    await openTable()
+    const panel = screen.getByRole('dialog', { name: 'Layers' })
+    const checkbox = within(panel).getAllByRole('checkbox')[0]
+    await act(async () => {
+      fireEvent.keyDown(checkbox, { key: 'Escape' })
+    })
+    expect(search().get('tableLevelNode')).toBe(TABLE_ID)
   })
 
   it('also takes a card click in the graph as a step to go back from', async () => {
