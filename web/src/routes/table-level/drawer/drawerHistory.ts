@@ -6,24 +6,41 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 
 /**
  * Back in the drawer. Moving from one open drawer to another node (a drawer link or a card
- * click) pushes a browser history entry whose `location.state` carries the ids of the nodes
- * before it. The drawer's Back button is `navigate(-1)`, so it and the browser's Back land on
- * the same entry: the previous node, on the tab its URL keeps in `drawerTab=`. Closing the
- * drawer pushes an entry without that state, which ends the history. The URL itself never
- * carries the history, so a shared link opens one node, with no Back.
+ * click) pushes a browser history entry whose `location.state` lists the nodes before it, each
+ * with its path and tab. The drawer's Back button goes to the last of them, on that tab, with
+ * the query as it is now: a scheme, layer, Depth or Compact change made since is kept, where
+ * the browser's own Back would bring back that entry's old query. Every query write in the
+ * table-level view (theme, layers, Depth, Full graph, Compact nodes, collapsed nodes, the tab)
+ * passes `location.state` on, so the list survives it. Closing the drawer pushes an entry
+ * without it, which ends the history. The URL never carries the history, so a shared link
+ * opens one node, with no Back.
  */
 
 /** The query parameter that keeps the open drawer's tab, e.g. `drawerTab=lineage`. */
 export const DRAWER_TAB_PARAM = 'drawerTab'
 
-export interface DrawerHistoryState {
-  drawerBack: string[]
+/** A node to go back to: its id, the path it was open on, and its tab then. */
+export interface BackEntry {
+  id: string
+  pathname: string
+  tab: string | null
 }
 
-/** The ids of the nodes before the open one, oldest first. */
-export const backStack = (state: unknown): string[] => {
+export interface DrawerHistoryState {
+  drawerBack: BackEntry[]
+}
+
+const isEntry = (e: unknown): e is BackEntry =>
+  typeof e === 'object' &&
+  e !== null &&
+  typeof (e as BackEntry).id === 'string' &&
+  typeof (e as BackEntry).pathname === 'string' &&
+  ((e as BackEntry).tab === null || typeof (e as BackEntry).tab === 'string')
+
+/** The nodes before the open one, oldest first. */
+export const backStack = (state: unknown): BackEntry[] => {
   const back = (state as Partial<DrawerHistoryState> | null)?.drawerBack
-  return Array.isArray(back) ? back.filter((id): id is string => typeof id === 'string') : []
+  return Array.isArray(back) ? back.filter(isEntry) : []
 }
 
 /**
@@ -38,8 +55,18 @@ export const useDrawerLinkState = () => {
     const stack = backStack(location.state)
     if (!open) return { drawerBack: [] }
     if (open === targetId) return { drawerBack: stack }
-    return { drawerBack: [...stack, open] }
+    const here = { id: open, pathname: location.pathname, tab: searchParams.get(DRAWER_TAB_PARAM) }
+    return { drawerBack: [...stack, here] }
   }
+}
+
+/** Where Back goes: the entry's path, node and tab, on the current query. */
+export const backUrl = (entry: BackEntry, search: string) => {
+  const params = new URLSearchParams(search)
+  params.set(DRAWER_NODE_PARAM, entry.id)
+  if (entry.tab) params.set(DRAWER_TAB_PARAM, entry.tab)
+  else params.delete(DRAWER_TAB_PARAM)
+  return `${entry.pathname}?${params.toString()}`
 }
 
 /** A node's short name for the Back button: the last part of its dotted name. */

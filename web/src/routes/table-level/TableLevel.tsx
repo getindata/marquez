@@ -1,8 +1,8 @@
 import * as Redux from 'redux'
 import { ActionBar } from './ActionBar'
 import { Box } from '@mui/system'
-import { Drawer } from '@mui/material'
 import { Graph, ZoomPanControls } from '../../../libs/graph'
+import { GraphDrawer } from './GraphDrawer'
 import { HEADER_HEIGHT } from '../../helpers/theme'
 import { IState } from '../../store/reducers'
 import { JobOrDataset } from '../../types/lineage'
@@ -27,12 +27,10 @@ import { connect } from 'react-redux'
 import { fetchLineage } from '../../store/actionCreators'
 import { useAxisTokens } from '../../theme'
 import { useCallbackRef } from '../../helpers/hooks'
-import { useCloseDrawer } from './useCloseDrawer'
 import { useLineageFetch } from './useLineageFetch'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 import ParentSize from '@visx/responsive/lib/components/ParentSize'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import TableLevelDrawer from './TableLevelDrawer'
 
 interface StateProps {
   lineage: LineageGraph
@@ -72,6 +70,7 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
   const t = useAxisTokens()
   const { nodeType, namespace, name } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
 
   const [depth, setDepth] = useState(Number(searchParams.get('depth')) || 2)
 
@@ -101,7 +100,6 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
     [catalog, layersParam]
   )
   const closeLayers = useCallback(() => setLayersOpen(false), [])
-  const closeDrawer = useCloseDrawer()
 
   // one hop more than shown, cut on the collapsed graph; Full graph asks for at least
   // FULL_GRAPH_DEPTH hops, more if Depth asks for more
@@ -148,7 +146,10 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
 
   const handleToggleLayer = (id: string) => {
     if (!catalog) return
-    setSearchParams(withActiveLayers(searchParams, toggleLayer(layerView.active, id), catalog))
+    // keep the history state, so the drawer's Back survives a layer toggle
+    setSearchParams(withActiveLayers(searchParams, toggleLayer(layerView.active, id), catalog), {
+      state: location.state,
+    })
   }
 
   return (
@@ -172,23 +173,7 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
         position='relative'
         sx={{ background: t.canvas }}
       >
-        <Drawer
-          anchor={'right'}
-          open={!!searchParams.get('tableLevelNode')}
-          onClose={closeDrawer}
-          PaperProps={{
-            sx: {
-              backgroundColor: t.drawer,
-              backgroundImage: 'none',
-              mt: `${HEADER_HEIGHT}px`,
-              height: `calc(100vh - ${HEADER_HEIGHT}px)`,
-            },
-          }}
-        >
-          <Box height='100%'>
-            <TableLevelDrawer catalog={catalog} onClose={closeDrawer} />
-          </Box>
-        </Drawer>
+        <GraphDrawer catalog={catalog} />
         <TableZoomControls
           onZoom={handleScaleZoom}
           onFitAll={handleFitAll}

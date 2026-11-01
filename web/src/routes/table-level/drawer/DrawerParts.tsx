@@ -1,7 +1,7 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { DRAWER_TAB_PARAM, backStack, shortName } from './drawerHistory'
+import { DRAWER_TAB_PARAM, backStack, backUrl, shortName } from './drawerHistory'
 import { LineageGraph } from '../../../types/api'
 import { useAxisTokens } from '../../../theme'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -93,7 +93,10 @@ export const useDrawerTab = <K extends string>(tabs: K[]): [K, (tab: K) => void]
   return [tab, setTab]
 }
 
-/** "← Back to <node>" while the drawer has a node to go back to; the same as the browser's Back. */
+/**
+ * "← Back to <node>" while the drawer has a node to go back to. It replaces the open node's
+ * history entry with the previous node, on its tab and the current query (see drawerHistory).
+ */
 export const BackButton = ({ lineage }: { lineage: LineageGraph }) => {
   const t = useAxisTokens()
   const location = useLocation()
@@ -101,14 +104,19 @@ export const BackButton = ({ lineage }: { lineage: LineageGraph }) => {
   const stack = backStack(location.state)
   if (!stack.length) return null
   const previous = stack[stack.length - 1]
-  const node = lineage.graph.find((n) => n.id === previous)
-  const name = node ? node.data.name : previous.split(':').pop() ?? previous
+  const node = lineage.graph.find((n) => n.id === previous.id)
+  const name = node ? node.data.name : previous.id.split(':').pop() ?? previous.id
   return (
     <div style={{ padding: '10px 18px 0' }}>
       <button
         type='button'
         title={name}
-        onClick={() => navigate(-1)}
+        onClick={() =>
+          navigate(backUrl(previous, location.search), {
+            replace: true,
+            state: { drawerBack: stack.slice(0, -1) },
+          })
+        }
         style={{
           border: `1px solid ${t.line}`,
           background: 'none',

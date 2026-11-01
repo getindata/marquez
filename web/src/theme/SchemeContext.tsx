@@ -12,7 +12,7 @@ import {
 } from './schemes'
 import { MUI_THEMES } from '../helpers/theme'
 import { ThemeProvider } from '@mui/material/styles'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import React, { ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 interface SchemeContextValue {
@@ -62,6 +62,7 @@ const prefersLight = (): boolean => {
  */
 export const SchemeProvider = ({ children }: { children: ReactNode }) => {
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const urlParam = searchParams.get(SCHEME_PARAM)
   const [chosen, setChosen] = useState<string | null>(readStored)
   const [systemLight, setSystemLight] = useState<boolean>(prefersLight)
@@ -98,13 +99,20 @@ export const SchemeProvider = ({ children }: { children: ReactNode }) => {
         writeStored(next)
         setChosen(next)
         // a URL that names a scheme would override the choice: keep it in step
+        // and keep the page's history state (the drawer's Back) as it is
         if (searchParams.has(SCHEME_PARAM)) {
-          searchParams.set(SCHEME_PARAM, next)
-          setSearchParams(searchParams)
+          setSearchParams(
+            (current) => {
+              const params = new URLSearchParams(current)
+              params.set(SCHEME_PARAM, next)
+              return params
+            },
+            { state: location.state }
+          )
         }
       },
     }),
-    [scheme, tokens, searchParams, setSearchParams]
+    [scheme, tokens, searchParams, setSearchParams, location.state]
   )
 
   return (

@@ -11,8 +11,10 @@ import { Provider } from 'react-redux'
 import { TableLineageDatasetNode } from '../../routes/table-level/TableLineageDatasetNode'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { createStore } from 'redux'
-import { useCloseDrawer } from '../../routes/table-level/useCloseDrawer'
-import TableLevelDrawer from '../../routes/table-level/TableLevelDrawer'
+import { ActionBar } from '../../routes/table-level/ActionBar'
+import { GraphDrawer } from '../../routes/table-level/GraphDrawer'
+import { LayersPanel } from '../../layers/LayersPanel'
+import { SchemeProvider, useScheme } from '../../theme'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
 
 jest.mock('../../store/requests/jobs', () => ({
@@ -36,8 +38,20 @@ const graph = () => {
   return lineage
 }
 
+/** The scheme switch, as the header's SchemeSwitch calls it. */
+const SchemeButton = () => {
+  const { setScheme } = useScheme()
+  return (
+    <button type='button' onClick={() => setScheme('light')}>
+      scheme light
+    </button>
+  )
+}
+
 const Page = () => {
-  const onClose = useCloseDrawer()
+  const [depth, setDepth] = React.useState(3)
+  const [isCompact, setIsCompact] = React.useState(false)
+  const [isFull, setIsFull] = React.useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const lineage = graph()
@@ -76,12 +90,30 @@ const Page = () => {
           }}
         />
       </svg>
+      {/* the view's real action bar: Depth, Full graph and Compact nodes write the query */}
+      <ActionBar
+        nodeType='DATASET'
+        fetchLineage={jest.fn() as any}
+        depth={depth}
+        setDepth={setDepth}
+        isCompact={isCompact}
+        setIsCompact={setIsCompact}
+        isFull={isFull}
+        setIsFull={setIsFull}
+      />
+      <SchemeButton />
+      {/* the view's real Layers panel, which closes itself on Escape */}
+      <LayersPanel
+        layers={catalog.layers}
+        active={new Set<string>()}
+        onToggle={() => undefined}
+        onClose={() => undefined}
+      />
       <button type='button' onClick={() => navigate(-1)}>
         browser back
       </button>
-      <div data-testid='drawer'>
-        <TableLevelDrawer catalog={catalog} onClose={onClose} />
-      </div>
+      {/* the view's real MUI drawer, as TableLevel renders it */}
+      <GraphDrawer catalog={catalog} />
       <output data-testid='search'>{location.search}</output>
     </>
   )
@@ -92,16 +124,19 @@ const renderPage = () => {
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[`/lineage/dataset/oracle/dw.fact_sales?${QUERY}`]}>
-        <Routes>
-          <Route path='/lineage/:nodeType/:namespace/:name' element={<Page />} />
-        </Routes>
+        <SchemeProvider>
+          <Routes>
+            <Route path='/lineage/:nodeType/:namespace/:name' element={<Page />} />
+          </Routes>
+        </SchemeProvider>
       </MemoryRouter>
     </Provider>
   )
 }
 
 const search = () => new URLSearchParams(screen.getByTestId('search').textContent as string)
-const drawer = () => within(screen.getByTestId('drawer'))
+/** The open drawer's paper; MUI renders it in a portal for a modal drawer, in place otherwise. */
+const drawer = () => within(document.querySelector('.MuiDrawer-paper') as HTMLElement)
 const click = async (el: Element) => {
   await act(async () => {
     fireEvent.click(el)
@@ -170,6 +205,40 @@ describe('Back in the drawer', () => {
     expectQueryKept()
   })
 
+  it('leaves the graph usable while open: no backdrop over it, nothing hidden from it', async () => {
+    renderPage()
+    await openTable()
+    expect(drawer().getByTestId('table-drawer')).toBeTruthy()
+    // a modal drawer's backdrop covers the graph, so a pointer click on a card closes the
+    // drawer instead of reaching the card (Playwright: "MuiBackdrop-root … intercepts pointer
+    // events"); a modal also marks the rest of the page aria-hidden
+    expect(document.querySelector('.MuiBackdrop-root')).toBeNull()
+    expect(document.querySelector('.MuiModal-root')).toBeNull()
+    expect(screen.getByTestId('job-card').closest('[aria-hidden="true"]')).toBeNull()
+  })
+
+  it('closes on Escape, keeping the query', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+    })
+    expect(search().get('tableLevelNode')).toBeNull()
+    expectQueryKept()
+  })
+
+  it('stays open on an Escape meant for the Layers panel', async () => {
+    renderPage()
+    await openTable()
+    const panel = screen.getByRole('dialog', { name: 'Layers' })
+    const checkbox = within(panel).getAllByRole('checkbox')[0]
+    await act(async () => {
+      fireEvent.keyDown(checkbox, { key: 'Escape' })
+    })
+    expect(search().get('tableLevelNode')).toBe(TABLE_ID)
+  })
+
   it('also takes a card click in the graph as a step to go back from', async () => {
     renderPage()
     await openTable()
@@ -189,6 +258,55 @@ describe('Back in the drawer', () => {
     expect(search().get('tableLevelNode')).toBe(TABLE_ID)
     expect(selectedTab()).toBe('Lineage')
     expect(back()).toBeNull()
+  })
+
+  it('drops drawerTab when a drawer open on a tab is closed, so the next node opens on its default', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    // closed straight from the tab, not after a link (a link already drops drawerTab)
+    expect(search().get('drawerTab')).toBe('lineage')
+    await click(drawer().getByRole('button', { name: 'Close' }))
+    expect(search().get('tableLevelNode')).toBeNull()
+    expect(search().get('drawerTab')).toBeNull()
+    expectQueryKept()
+    await openTable()
+    expect(selectedTab()).toBe(drawer().getAllByRole('tab')[0].textContent)
+    expect(selectedTab()).not.toBe('Lineage')
+  })
+
+  it('keeps Back through a scheme switch, and Back keeps the new scheme', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    await click(drawer().getByTestId('lineage-job'))
+    await click(screen.getByRole('button', { name: 'scheme light' }))
+    expect(search().get('theme')).toBe('light')
+    expect(back()?.textContent).toBe('← Back to fact_sales')
+    await click(back() as Element)
+    expect(search().get('tableLevelNode')).toBe(TABLE_ID)
+    expect(selectedTab()).toBe('Lineage')
+    // Back does not restore the query the table had: the scheme stays as switched
+    expect(search().get('theme')).toBe('light')
+    expect(search().get('layers')).toBe('wave,complexity')
+  })
+
+  it('keeps Back through Depth and Compact nodes, and Back keeps them', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    await click(drawer().getByTestId('lineage-job'))
+    await click(screen.getByRole('button', { name: 'Increase depth' }))
+    await click(screen.getByRole('checkbox', { name: 'Compact nodes' }))
+    expect(search().get('depth')).toBe('4')
+    expect(search().get('isCompact')).toBe('true')
+    expect(back()?.textContent).toBe('← Back to fact_sales')
+    await click(back() as Element)
+    expect(search().get('tableLevelNode')).toBe(TABLE_ID)
+    expect(selectedTab()).toBe('Lineage')
+    expect(search().get('depth')).toBe('4')
+    expect(search().get('isCompact')).toBe('true')
+    expect(search().get('theme')).toBe('xebia')
   })
 
   it('forgets the history when the drawer is closed', async () => {

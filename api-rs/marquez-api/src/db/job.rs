@@ -306,7 +306,10 @@ pub async fn update_job_tag(
 /// Find a job by namespace and name with facets and tags.
 ///
 /// Uses CTEs to aggregate job facets and tags, then joins them with
-/// `jobs_view`. Matches Java `JobDao.findJobByName()` (the enriched variant).
+/// `jobs_view`. Matches Java `JobDao.findJobByName()` (the enriched variant),
+/// except that facets are aggregated in `lineage_event_time` order: a version
+/// pushed more than once keeps every facet row, and the "last wins" merge
+/// must pick the newest.
 pub async fn find_job_by_name_with_facets(
     pool: &PgPool,
     namespace_name: &str,
@@ -314,7 +317,7 @@ pub async fn find_job_by_name_with_facets(
 ) -> Result<Option<JobWithFacetsRow>, sqlx::Error> {
     sqlx::query_as::<_, JobWithFacetsRow>(
         "WITH job_versions_facets AS ( \
-            SELECT f.job_version_uuid, JSON_AGG(f.facet) as facets \
+            SELECT f.job_version_uuid, JSON_AGG(f.facet ORDER BY f.lineage_event_time ASC) as facets \
             FROM job_facets f \
             LEFT JOIN jobs_view j ON j.current_version_uuid = f.job_version_uuid \
             WHERE j.namespace_name = $1 AND (j.name = $2 OR $2 = ANY(j.aliases)) \

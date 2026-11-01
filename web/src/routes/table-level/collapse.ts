@@ -3,30 +3,21 @@
 
 import { LineageEdge, LineageJob, LineageNode } from '../../types/lineage'
 import { LineageGraph } from '../../types/api'
-
-/** The job types of a dataset's own job: Axis emits one per table or view, named after it. */
-const OWN_JOB_TYPES = new Set(['table', 'view', 'materialized_view'])
+import { isOwnDatasetJob as isOwnJob } from '../../layers/hiddenJobs'
 
 /**
- * Whether a job is a dataset's own job (the DDL of a table or view): its standard `jobType`
- * facet says table, view or materialized view, and its only output is the dataset of its own
- * name in its own namespace. Recognised by the facets, never by the name alone.
+ * Whether a lineage job node is a dataset's own job (the DDL of a table or view), by the rule
+ * the job lists share (layers/hiddenJobs.ts): `jobType` table, view or materialized view, and
+ * its only output the dataset of its own name in its own namespace.
  */
 export const isOwnDatasetJob = (node: LineageNode, byId: Map<string, LineageNode>): boolean => {
   if (node.type !== 'JOB') return false
-  const job = node.data as LineageJob
-  const facet = (job.facets as Record<string, any> | undefined)?.jobType
-  const type = typeof facet?.jobType === 'string' ? facet.jobType.toLowerCase() : ''
-  if (!OWN_JOB_TYPES.has(type)) return false
-  const outputs = new Set(node.outEdges.map((e) => e.destination))
-  if (outputs.size !== 1) return false
-  const output = byId.get(Array.from(outputs)[0])
-  return (
-    !!output &&
-    output.type === 'DATASET' &&
-    output.data.name === job.name &&
-    output.data.namespace === job.namespace
-  )
+  const outputs = node.outEdges
+    .map((e) => byId.get(e.destination))
+    .filter((n): n is LineageNode => !!n && n.type === 'DATASET')
+    .map((n) => ({ namespace: n.data.namespace, name: n.data.name }))
+  if (outputs.length !== node.outEdges.length) return false // an output that is not a dataset
+  return isOwnJob(node.data as LineageJob, outputs)
 }
 
 export interface CollapsedGraph {
