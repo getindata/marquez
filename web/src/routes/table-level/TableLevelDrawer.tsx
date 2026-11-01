@@ -1,18 +1,13 @@
 import * as Redux from 'redux'
-import { Box } from '@mui/system'
 import { IState } from '../../store/reducers'
+import { JobDrawer } from './drawer/JobDrawer'
 import { LayerCatalog } from '../../layers'
 import { LineageGraph } from '../../types/api'
-import { LineageJob } from '../../types/lineage'
 import { TableDrawer } from './drawer/TableDrawer'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 import { useSearchParams } from 'react-router-dom'
-import JobDetailPage from '../../components/jobs/JobDetailPage'
 import React from 'react'
-
-/** The stock drawer's width, kept for jobs. */
-const JOB_WIDTH = 800
 
 interface OwnProps {
   /** The namespace's layer catalog, for the table drawer's heat, wave and complexity. */
@@ -24,7 +19,7 @@ interface StateProps {
 }
 interface DispatchProps {}
 
-/** A dataset opens the Axis table drawer (design §7.4); a job keeps the stock drawer. */
+/** A dataset opens the Axis table drawer (design §7.4), a job the Axis job drawer. */
 const TableLevelDrawer = ({
   lineageGraph,
   catalog,
@@ -47,11 +42,18 @@ const TableLevelDrawer = ({
       />
     )
   }
-  return (
-    <Box width={`${JOB_WIDTH}px`}>
-      {node?.type === 'JOB' && <JobDetailPage lineageJob={node.data as LineageJob} />}
-    </Box>
-  )
+  if (node?.type === 'JOB') {
+    return (
+      <JobDrawer
+        key={node.id}
+        node={node}
+        lineage={lineageGraph}
+        catalog={catalog}
+        onClose={onClose}
+      />
+    )
+  }
+  return null
 }
 
 const mapStateToProps = (state: IState) => ({

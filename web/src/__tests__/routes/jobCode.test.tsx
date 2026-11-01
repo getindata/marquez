@@ -3,11 +3,8 @@
 
 import * as React from 'react'
 import { JobCode, jobCodeBlocks } from '../../routes/table-level/drawer/JobCode'
-import { Provider } from 'react-redux'
 import { SCHEMES, SchemeContext, SchemeName } from '../../theme'
-import { createStore } from 'redux'
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import RunInfo from '../../components/jobs/RunInfo'
 
 /** A synthetic PL/SQL procedure, as an Oracle job's facets carry it. */
 const QUERY = `MERGE INTO dw.fact_sales t USING stg.sales_raw s ON (t.sale_id = s.sale_id)
@@ -28,11 +25,9 @@ const withScheme = (scheme: SchemeName, ui: React.ReactElement) => (
   </SchemeContext.Provider>
 )
 
-const renderRunInfo = (scheme: SchemeName, facets: object = FACETS) => {
-  const store = createStore(() => ({ facets: { result: facets } }))
-  const run = { id: 'run-1', facets: null } as any
-  return render(<Provider store={store}>{withScheme(scheme, <RunInfo run={run} />)}</Provider>)
-}
+/** The job drawer's Code tab, as the Axis job drawer renders it. */
+const renderCode = (scheme: SchemeName, facets: object = FACETS) =>
+  render(withScheme(scheme, <JobCode facets={facets} />))
 
 describe('a job’s code in the job drawer', () => {
   it.each([
@@ -42,7 +37,7 @@ describe('a job’s code in the job drawer', () => {
   ] as const)(
     'renders the sql facet through DdlCode with keyword colours in %s (%s)',
     (scheme, editor, keyword) => {
-      renderRunInfo(scheme)
+      renderCode(scheme)
       const sql = screen.getByTestId('job-code-sql')
       const code = within(sql).getByTestId('ddl-code')
       expect(code.getAttribute('data-editor')).toBe(editor)
@@ -53,7 +48,7 @@ describe('a job’s code in the job drawer', () => {
   )
 
   it('renders a PL/SQL source code facet the same way', () => {
-    renderRunInfo('light')
+    renderCode('light')
     const source = screen.getByTestId('job-code-sourceCode')
     const code = within(source).getByTestId('ddl-code')
     expect(within(code).getByText('BEGIN').style.color).toBe('rgb(0, 0, 255)')
@@ -63,7 +58,7 @@ describe('a job’s code in the job drawer', () => {
   it('copies the code shown', () => {
     const writeText = jest.fn(() => Promise.resolve())
     Object.assign(navigator, { clipboard: { writeText } })
-    renderRunInfo('dark')
+    renderCode('dark')
     fireEvent.click(
       within(screen.getByTestId('job-code-sql')).getByRole('button', { name: 'Copy' })
     )
@@ -72,7 +67,7 @@ describe('a job’s code in the job drawer', () => {
 
   it('keeps the large-input guard', () => {
     const big = Array.from({ length: 6000 }, (_, i) => `  UPDATE t SET c = ${i};`).join('\n')
-    const { container } = renderRunInfo('dark', { sql: { query: big } })
+    const { container } = renderCode('dark', { sql: { query: big } })
     expect(screen.getByTestId('ddl-large-note')).toBeTruthy()
     expect(container.querySelectorAll('.token').length).toBe(0)
   })
@@ -107,7 +102,7 @@ describe('a job’s code in the job drawer', () => {
     expect(jobCodeBlocks({ ...facets, sql: { query: '   ' } }).map((b) => b.facet)).toEqual([
       'sourceCode',
     ])
-    renderRunInfo('dark', facets)
+    renderCode('dark', facets)
     expect(screen.queryByTestId('job-code-sql')).toBeNull()
     expect(screen.getByTestId('job-code-sourceCode')).toBeTruthy()
   })

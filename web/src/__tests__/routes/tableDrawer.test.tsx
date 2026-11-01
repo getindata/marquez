@@ -465,9 +465,9 @@ describe('the table-level drawer host', () => {
     expect(screen.queryByTestId('stock-dataset-drawer')).toBeNull()
   })
 
-  it('keeps the stock drawer for a job', () => {
+  it('opens the job drawer, not the table drawer, for a job', () => {
     host('job:oracle:etl.load_sales')
     expect(screen.queryByTestId('table-drawer')).toBeNull()
-    expect(screen.getByTestId('stock-job-drawer')).toBeTruthy()
+    expect(screen.getByTestId('job-drawer')).toBeTruthy()
   })
 })

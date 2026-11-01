@@ -27,7 +27,7 @@ import React, { CSSProperties, ReactNode } from 'react'
 const JOB_CHARS = 60
 const DATASET_CHARS = 56
 
-const DatasetLinks = ({ lead, datasets }: { lead?: ReactNode; datasets: DatasetRef[] }) => {
+export const DatasetLinks = ({ lead, datasets }: { lead?: ReactNode; datasets: DatasetRef[] }) => {
   const t = useAxisTokens()
   const [searchParams] = useSearchParams()
   if (!datasets.length && !lead) return null

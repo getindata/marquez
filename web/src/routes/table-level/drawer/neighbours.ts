@@ -42,7 +42,7 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
  * The datasets a job reads or writes: its edges in the fetched graph, and its `inputs` or
  * `outputs`, which still name the datasets past the edge of the fetched depth.
  */
-const jobDatasets = (
+export const jobDatasets = (
   node: LineageNode,
   byId: Map<string, LineageNode>,
   dir: 'inputs' | 'outputs'
