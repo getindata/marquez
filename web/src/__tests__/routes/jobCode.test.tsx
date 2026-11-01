@@ -97,6 +97,26 @@ describe('a job’s code in the job drawer', () => {
     expect(container.querySelector('pre')?.textContent).toBe('print(1)')
   })
 
+  it('hides an sql facet that only repeats part of the source code', () => {
+    // the Oracle producer sends the unit's first line as the sql query
+    const facets = {
+      sql: { query: '  PROCEDURE load_sales IS ', dialect: 'oracle' },
+      sourceCode: { language: 'plsql', sourceCode: SOURCE },
+    }
+    expect(jobCodeBlocks(facets).map((b) => b.facet)).toEqual(['sourceCode'])
+    expect(jobCodeBlocks({ ...facets, sql: { query: '   ' } }).map((b) => b.facet)).toEqual([
+      'sourceCode',
+    ])
+    renderRunInfo('dark', facets)
+    expect(screen.queryByTestId('job-code-sql')).toBeNull()
+    expect(screen.getByTestId('job-code-sourceCode')).toBeTruthy()
+  })
+
+  it('keeps an sql facet that adds code the source does not have, or that stands alone', () => {
+    expect(jobCodeBlocks(FACETS).map((b) => b.facet)).toEqual(['sql', 'sourceCode'])
+    expect(jobCodeBlocks({ sql: { query: 'select 1' } }).map((b) => b.facet)).toEqual(['sql'])
+  })
+
   it('shows nothing without code facets', () => {
     expect(jobCodeBlocks({ jobType: {} })).toEqual([])
     expect(jobCodeBlocks(undefined)).toEqual([])
