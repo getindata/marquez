@@ -13,7 +13,7 @@ import {
   neighbourGraph,
   neighbourNode,
 } from './tableDrawer.fixtures'
-import { DESIGN_CATALOG } from '../layers/fixtures'
+import { DESIGN_CATALOG, FULL_CATALOG, axisLayers, piiTags } from '../layers/fixtures'
 import { EDITOR_COLORS } from '../../routes/table-level/drawer/DdlCode'
 import { LayerCatalog, parseLayerCatalog } from '../../layers'
 import { LineageGraph } from '../../types/api'
@@ -50,14 +50,19 @@ const NO_TARGET = { ...AXIS_DDL, ...SCHEMA, ...LAYERS, ...migration('will_apply'
 const GRAPH_URL =
   '/lineage/dataset/oracle/dw.fact_sales?theme=xebia&layers=wave&depth=3&tableLevelNode=dataset%3Aoracle%3Adw.fact_sales'
 
-const renderNode = (node: LineageNode, lineage: LineageGraph, scheme: SchemeName = 'dark') => {
+const renderNode = (
+  node: LineageNode,
+  lineage: LineageGraph,
+  scheme: SchemeName = 'dark',
+  layerCatalog: LayerCatalog = catalog
+) => {
   const onClose = jest.fn()
   const utils = render(
     <MemoryRouter initialEntries={[GRAPH_URL]}>
       <SchemeContext.Provider
         value={{ scheme, tokens: SCHEMES[scheme], setScheme: () => undefined }}
       >
-        <TableDrawer node={node} lineage={lineage} catalog={catalog} onClose={onClose} />
+        <TableDrawer node={node} lineage={lineage} catalog={layerCatalog} onClose={onClose} />
       </SchemeContext.Provider>
     </MemoryRouter>
   )
@@ -469,5 +474,66 @@ describe('the table-level drawer host', () => {
     host('job:oracle:etl.load_sales')
     expect(screen.queryByTestId('table-drawer')).toBeNull()
     expect(screen.getByTestId('stock-job-drawer')).toBeTruthy()
+  })
+})
+
+describe('descriptions, PII and the LAY-10 layers in the drawer', () => {
+  const DESCRIBED = {
+    ...SCHEMA,
+    documentation: { description: 'Sales facts, one row per receipt line.' },
+    schema: {
+      fields: [
+        { name: 'sale_id', type: 'NUMBER', description: 'Key of the sale.' },
+        { name: 'email', type: 'VARCHAR2' },
+      ],
+    },
+    ...piiTags({ email: 'email' }),
+  }
+
+  it("shows the table's description under its name", () => {
+    renderDrawer(DESCRIBED)
+    expect(screen.getByTestId('drawer-description').textContent).toBe(
+      'Sales facts, one row per receipt line.'
+    )
+  })
+
+  it('has no description line without one', () => {
+    renderDrawer({ ...SCHEMA })
+    expect(screen.queryByTestId('drawer-description')).toBeNull()
+  })
+
+  it("shows each column's description under its name, and marks the PII column with its kind", () => {
+    renderDrawer(DESCRIBED)
+    const rows = screen.getAllByTestId('column-row')
+    expect(within(rows[0]).getByTestId('column-description').textContent).toBe('Key of the sale.')
+    expect(within(rows[0]).queryByTestId('pii-marker')).toBeNull()
+    expect(within(rows[1]).queryByTestId('column-description')).toBeNull()
+    expect(within(rows[1]).getByTestId('pii-chip').textContent).toBe('email')
+    expect(within(rows[1]).getByTestId('pii-marker').getAttribute('aria-label')).toBe(
+      'Personal data: email'
+    )
+  })
+
+  it('keeps the descriptions when the migration maps the columns', () => {
+    renderDrawer({ ...DESCRIBED, ...migration('applied') })
+    fireEvent.click(tab('Columns'))
+    const row = screen
+      .getAllByTestId('column-row')
+      .find((r) => r.textContent?.startsWith('sale_id'))!
+    expect(within(row).getByTestId('column-description').textContent).toBe('Key of the sale.')
+  })
+
+  it('shows the zone chip, the size and the status dot in the header', () => {
+    const full = parseLayerCatalog(FULL_CATALOG).catalog as LayerCatalog
+    const { node, lineage } = graphWith({
+      ...SCHEMA,
+      ...axisLayers({ wave: 1, zone: 'core', size: 1288490188, status: 'reconciled' }),
+    })
+    renderNode(node, lineage, 'dark', full)
+    expect(screen.getByTestId('tag-chip').textContent).toBe('core')
+    expect(screen.getByTestId('size-label').textContent).toBe('1.2 GB')
+    expect(screen.getByTestId('status-dot').style.background).toBe('rgb(34, 197, 94)')
+    // with no migration or reconcile facet, the status line is the layer's
+    expect(screen.getByTestId('drawer-status').textContent).toBe('reconciled')
   })
 })

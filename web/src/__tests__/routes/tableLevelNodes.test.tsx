@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from 'react'
-import { DESIGN_CATALOG, axisLayers } from '../layers/fixtures'
+import { DESIGN_CATALOG, FULL_CATALOG, axisLayers, piiTags } from '../layers/fixtures'
 import {
   LayerCatalog,
   LayerView,
@@ -15,7 +15,7 @@ import { LineageDataset, LineageJob } from '../../types/lineage'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { TableLineageDatasetNode } from '../../routes/table-level/TableLineageDatasetNode'
 import { SCHEMES } from '../../theme/schemes'
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
 
 const catalog = parseLayerCatalog(DESIGN_CATALOG).catalog as LayerCatalog
@@ -25,7 +25,11 @@ const ALL_ON: LayerView = {
 }
 const ALL_OFF: LayerView = { catalog, active: new Set() }
 
-const dataset = (facets: object | undefined, fieldCount = 6): LineageDataset =>
+const dataset = (
+  facets: object | undefined,
+  fieldCount = 6,
+  descriptions: Record<string, string> = {}
+): LineageDataset =>
   ({
     id: { namespace: 'oracle', name: 'dw.fact_sales' },
     type: 'DB_TABLE',
@@ -35,7 +39,7 @@ const dataset = (facets: object | undefined, fieldCount = 6): LineageDataset =>
       name: `col_${i}`,
       type: 'NUMBER(12,2)',
       tags: [],
-      description: '',
+      description: descriptions[`col_${i}`] ?? null,
     })),
     facets,
   } as unknown as LineageDataset)
@@ -65,8 +69,13 @@ const inRouter = (ui: React.ReactElement, path = '/lineage/dataset/oracle/other'
     </MemoryRouter>
   )
 
-const renderDataset = (view: LayerView, facets: object | undefined, showFields = true) => {
-  const data = dataset(facets)
+const renderDataset = (
+  view: LayerView,
+  facets: object | undefined,
+  showFields = true,
+  descriptions: Record<string, string> = {}
+) => {
+  const data = dataset(facets, 6, descriptions)
   const node = {
     id: 'dataset:oracle:dw.fact_sales',
     kind: 'DATASET' as const,
@@ -164,7 +173,154 @@ describe('dataset node', () => {
   })
 })
 
+const full = parseLayerCatalog(FULL_CATALOG).catalog as LayerCatalog
+const FULL_ON: LayerView = { catalog: full, active: new Set(full.layers.map((l) => l.id)) }
+const LAY10_FACETS = axisLayers({
+  wave: 1,
+  heat: 8400,
+  complexity: 0.64,
+  zone: 'core',
+  size: 1288490188,
+  status: 'reconciled',
+  decommission: true,
+})
+
+/** The text of the tooltip that hovering `el` opens. */
+const hoverTooltip = async (el: Element) => {
+  fireEvent.mouseOver(el)
+  return (await screen.findByRole('tooltip')).textContent
+}
+
+describe('dataset node, the LAY-10 layers', () => {
+  it('draws the zone chip, the status dot, the size label and the decommission mark', () => {
+    const { container } = renderDataset(FULL_ON, LAY10_FACETS)
+    const chip = q(container, 'tag-chip')
+    expect(chip.textContent).toBe('core')
+    expect(chip.style.border).toBe('1px solid #8b5cf6')
+    expect(q(container, 'status-dot').style.background).toBe('rgb(34, 197, 94)')
+    expect(q(container, 'size-label').textContent).toBe('1.2 GB')
+    expect(q(container, 'meter-row').textContent).toBe('complexity0.64')
+    expect(q(container, 'flag-marker')).not.toBeNull()
+    expect(q(container, 'wave-chip').textContent).toBe('Wave 1')
+  })
+
+  it.each(['zone', 'size', 'status', 'decommission'])(
+    'turning %s off hides only its marks',
+    (off) => {
+      const active = new Set(FULL_ON.active)
+      active.delete(off)
+      const { container } = renderDataset({ catalog: full, active }, LAY10_FACETS)
+      expect(!!q(container, 'tag-chip')).toBe(off !== 'zone')
+      expect(!!q(container, 'size-label')).toBe(off !== 'size')
+      expect(!!q(container, 'status-dot')).toBe(off !== 'status')
+      expect(!!q(container, 'flag-marker')).toBe(off !== 'decommission')
+      expect(q(container, 'wave-chip')).not.toBeNull()
+      expect(q(container, 'heat-dot')).not.toBeNull()
+      expect(q(container, 'meter-row')).not.toBeNull()
+    }
+  )
+
+  it('gives the size label its own row, named, when complexity is off', () => {
+    const active = new Set(['size'])
+    const { container } = renderDataset({ catalog: full, active }, LAY10_FACETS)
+    expect(q(container, 'facts-row').textContent).toBe('table size1.2 GB')
+    expect(q(container, 'meter-row')).toBeNull()
+  })
+
+  it('shows the status and the zone in the name tooltip', async () => {
+    const { container } = renderDataset(FULL_ON, LAY10_FACETS)
+    const text = await hoverTooltip(container.querySelector('[data-testid="dataset-name"]')!)
+    expect(text).toContain('Migration status: reconciled')
+    expect(text).toContain('Data zone: core')
+    expect(text).toContain('Table size: 1.2 GB')
+  })
+})
+
+describe('dataset node, PII columns', () => {
+  it('marks the PII columns with a shield, and no other column', () => {
+    const { container } = renderDataset(NO_LAYERS, piiTags({ col_1: 'email', col_3: 'passport' }))
+    const rows = Array.from(container.querySelectorAll('[data-testid="field-row"]'))
+    expect(rows.map((r) => !!r.querySelector('[data-testid="pii-marker"]'))).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ])
+    expect(rows[1].querySelector('[data-testid="pii-marker"]')?.getAttribute('aria-label')).toBe(
+      'Personal data: email'
+    )
+  })
+
+  it('shows the kind when hovering the row', async () => {
+    const { container } = renderDataset(NO_LAYERS, piiTags({ col_1: 'email' }))
+    const row = container.querySelectorAll('[data-testid="field-row"]')[1]
+    expect(await hoverTooltip(row)).toContain('Personal data: email')
+  })
+
+  it('matches the column whatever the case, and is on with every layer off', () => {
+    const { container } = renderDataset(ALL_OFF, piiTags({ COL_0: 'name' }))
+    const rows = container.querySelectorAll('[data-testid="field-row"]')
+    expect(rows[0].querySelector('[data-testid="pii-marker"]')).not.toBeNull()
+  })
+
+  it('ignores tags that are not PII or name no column', () => {
+    const { container } = renderDataset(NO_LAYERS, {
+      tags: {
+        tags: [
+          { key: 'owner', value: 'finance', field: 'col_0' },
+          { key: 'pii', value: 'email' },
+          { key: 'pii', value: 'phone', field: 'not_a_column' },
+        ],
+      },
+    })
+    expect(q(container, 'pii-marker')).toBeNull()
+  })
+})
+
+describe('dataset node, descriptions', () => {
+  const DOC = { documentation: { description: 'Sales facts, one row per receipt line.' } }
+
+  it("shows the table's description in the name tooltip", async () => {
+    const { container } = renderDataset(NO_LAYERS, DOC)
+    const text = await hoverTooltip(container.querySelector('[data-testid="dataset-name"]')!)
+    expect(text).toContain('Sales facts, one row per receipt line.')
+  })
+
+  it('has no description line without one', async () => {
+    const { container } = renderDataset(NO_LAYERS, {})
+    await hoverTooltip(container.querySelector('[data-testid="dataset-name"]')!)
+    expect(screen.queryByTestId('tooltip-description')).toBeNull()
+  })
+
+  it("shows a column's description when hovering its row", async () => {
+    const { container } = renderDataset(NO_LAYERS, {}, true, { col_2: 'Net amount in PLN.' })
+    const row = container.querySelectorAll('[data-testid="field-row"]')[2]
+    const text = await hoverTooltip(row)
+    expect(text).toContain('col_2')
+    expect(text).toContain('Net amount in PLN.')
+  })
+
+  it('opens no tooltip on a row with neither a description nor PII', async () => {
+    const { container } = renderDataset(NO_LAYERS, {}, true, { col_2: 'Net amount in PLN.' })
+    fireEvent.mouseOver(container.querySelectorAll('[data-testid="field-row"]')[0])
+    await new Promise((r) => setTimeout(r, 300))
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+})
+
 describe('job node', () => {
+  it('draws the status dot with the status layer on, and none with it off', () => {
+    const facets = { ...JOB_FACETS, ...axisLayers({ wave: 1, status: 'failed' }) }
+    const on = renderJob(FULL_ON, facets)
+    expect(q(on.container, 'status-dot').style.background).toBe('rgb(239, 68, 68)')
+    on.unmount()
+    const active = new Set(FULL_ON.active)
+    active.delete('status')
+    const off = renderJob({ catalog: full, active }, facets)
+    expect(q(off.container, 'status-dot')).toBeNull()
+    expect(q(off.container, 'wave-chip')).not.toBeNull()
+  })
+
   it('draws the type tile, badge, wave and meter with every layer on', () => {
     const { container } = renderJob(ALL_ON, JOB_FACETS)
     expect(container.querySelector('[data-glyph="plsql"]')).not.toBeNull()

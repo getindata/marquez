@@ -4,6 +4,7 @@ import {
   FillChip,
   MeterRow,
   NodeFrame,
+  StatusDot,
   TooltipLine,
   ellipsis,
   monoChars,
@@ -65,6 +66,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
       <TooltipLine label='Updated at:'>{formatUpdatedAt(job.updatedAt)}</TooltipLine>
       {wave && <TooltipLine label='Layer:'>{wave.tooltip}</TooltipLine>}
       {marks.badge && <TooltipLine label='Layer:'>{marks.badge.tooltip}</TooltipLine>}
+      {marks.status && <TooltipLine label='Layer:'>{marks.status.tooltip}</TooltipLine>}
       {marks.meter && (
         <TooltipLine label='Layer:'>
           {marks.meter.label} {marks.meter.text}
@@ -166,6 +168,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
                 ))}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                {marks.status && <StatusDot status={marks.status} ownTooltip={false} />}
                 <span
                   data-testid='job-type-caption'
                   style={{ ...ellipsis, color: t.muted, fontSize: 10.5 }}

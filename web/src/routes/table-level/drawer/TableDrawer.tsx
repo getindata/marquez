@@ -19,12 +19,13 @@ import {
 import { AxisTokens, useAxisTokens } from '../../../theme'
 import { CopyButton } from './CopyButton'
 import { DdlCode } from './DdlCode'
-import { FillChip, MeterRow, tailFit } from '../cardParts'
+import { FillChip, MeterRow, PiiShield, StatusDot, TagChip, tailFit } from '../cardParts'
 import { LayerCatalog, NodeMarks } from '../../../layers'
 import { LineageDataset, LineageJob, LineageNode } from '../../../types/lineage'
 import { LineageGraph } from '../../../types/api'
 import { LineageTab } from './LineageTab'
 import { allMarks } from './marks'
+import { datasetDescription, piiColumns, piiLabel } from '../columnFacts'
 import { datasetTypeOf } from '../TableLineageDatasetNode'
 import { isOwnDatasetJob } from '../collapse'
 import MqJsonView from '../../../components/core/json-view/MqJsonView'
@@ -348,9 +349,12 @@ const DdlTab = ({
 export const ColumnsTab = ({
   columns,
   migration,
+  pii = new Map(),
 }: {
   columns: DrawerColumn[]
   migration: AxisMigration | null
+  /** PII kinds by lower-cased column name. */
+  pii?: Map<string, string[]>
 }) => {
   const t = useAxisTokens()
   const mapped = columns.some((c) => c.target !== undefined)
@@ -378,26 +382,55 @@ export const ColumnsTab = ({
         </tr>
       </thead>
       <tbody>
-        {columns.map((c) => (
-          <tr key={c.name} data-testid='column-row'>
-            <td style={{ ...cell, ...mono }}>{c.name}</td>
-            <td style={{ ...cell, ...mono, color: t.muted }}>{c.source || '—'}</td>
-            {mapped && <td style={{ ...cell, ...mono }}>{c.target || '—'}</td>}
-            {mapped && (
+        {columns.map((c) => {
+          const kinds = pii.get(c.name.toLowerCase())
+          return (
+            <tr key={c.name} data-testid='column-row'>
               <td style={cell}>
-                {c.target === undefined ? null : c.exact ? (
-                  <Chip bg={t.verifiedBg} color={t.verifiedText}>
-                    exact
-                  </Chip>
-                ) : (
-                  <Chip bg={t.agentBg} color={t.agentText}>
-                    needs review
-                  </Chip>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...mono }}>
+                  {c.name}
+                  {kinds && (
+                    <span
+                      title={piiLabel(kinds)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <PiiShield label={piiLabel(kinds)} size={13} />
+                      <span
+                        data-testid='pii-chip'
+                        style={{ fontFamily: t.font, fontSize: 11, color: t.pii }}
+                      >
+                        {kinds.join(', ')}
+                      </span>
+                    </span>
+                  )}
+                </div>
+                {c.description && (
+                  <div
+                    data-testid='column-description'
+                    style={{ marginTop: 2, fontSize: 12, color: t.muted, lineHeight: 1.4 }}
+                  >
+                    {c.description}
+                  </div>
                 )}
               </td>
-            )}
-          </tr>
-        ))}
+              <td style={{ ...cell, ...mono, color: t.muted }}>{c.source || '—'}</td>
+              {mapped && <td style={{ ...cell, ...mono }}>{c.target || '—'}</td>}
+              {mapped && (
+                <td style={cell}>
+                  {c.target === undefined ? null : c.exact ? (
+                    <Chip bg={t.verifiedBg} color={t.verifiedText}>
+                      exact
+                    </Chip>
+                  ) : (
+                    <Chip bg={t.agentBg} color={t.agentText}>
+                      needs review
+                    </Chip>
+                  )}
+                </td>
+              )}
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )
@@ -421,6 +454,10 @@ const Header = ({
     .filter(Boolean)
     .join(' · ')
   const shownWriters = writers.slice(0, 3)
+  const description = datasetDescription(dataset)
+  // the status layer speaks when neither the migration nor the reconcile facet does
+  const statusParts: StatusPart[] =
+    status.length || !marks.status ? status : [{ text: marks.status.label, tone: 'plain' }]
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 18px 10px' }}>
@@ -450,9 +487,26 @@ const Header = ({
           >
             {dataset.name}
           </div>
-          <div style={{ color: t.muted, fontSize: 12 }}>{sub}</div>
+          <div style={{ color: t.muted, fontSize: 12 }}>
+            {sub}
+            {marks.label && (
+              <>
+                {' · '}
+                <b
+                  data-testid='size-label'
+                  title={marks.label.tooltip}
+                  style={{ fontWeight: 600, color: marks.label.color }}
+                >
+                  {marks.label.text}
+                </b>
+              </>
+            )}
+          </div>
         </div>
-        {marks.fill ? <FillChip fill={marks.fill} /> : <span style={{ marginLeft: 'auto' }} />}
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flex: 'none' }}>
+          {marks.tag && <TagChip tag={marks.tag} />}
+          {marks.fill && <FillChip fill={marks.fill} />}
+        </span>
         <button
           type='button'
           aria-label='Close'
@@ -468,7 +522,21 @@ const Header = ({
           ✕
         </button>
       </div>
-      {(marks.meter || writers.length > 0 || status.length > 0) && (
+      {description && (
+        <div
+          data-testid='drawer-description'
+          style={{
+            padding: '0 18px 12px',
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: t.text,
+            maxWidth: 680,
+          }}
+        >
+          {description}
+        </div>
+      )}
+      {(marks.meter || writers.length > 0 || statusParts.length > 0) && (
         <div
           data-testid='drawer-meta'
           style={{
@@ -497,11 +565,11 @@ const Header = ({
                 ` + ${writers.length - shownWriters.length} more`}
             </span>
           )}
-          {status.length > 0 && (
-            <span>
-              status{' '}
+          {statusParts.length > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              status {marks.status && <StatusDot status={marks.status} />}
               <b data-testid='drawer-status' style={{ fontWeight: 600 }}>
-                {status.map((part, i) => (
+                {statusParts.map((part, i) => (
                   <React.Fragment key={part.text}>
                     {i > 0 && <span style={{ color: t.muted }}> · </span>}
                     <span
@@ -609,7 +677,9 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
         {tab === 'ddl' && (
           <DdlTab source={ddl} migration={migration} view={view} onView={setView} />
         )}
-        {tab === 'columns' && <ColumnsTab columns={columns} migration={migration} />}
+        {tab === 'columns' && (
+          <ColumnsTab columns={columns} migration={migration} pii={piiColumns(facets)} />
+        )}
         {tab === 'lineage' && <LineageTab node={node} lineage={lineage} catalog={catalog} />}
         {tab === 'facets' && <MqJsonView data={(facets as object) ?? {}} />}
       </div>

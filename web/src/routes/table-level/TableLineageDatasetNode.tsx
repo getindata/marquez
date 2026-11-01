@@ -13,6 +13,10 @@ import {
   FillChip,
   MeterRow,
   NodeFrame,
+  PiiShield,
+  StatusDot,
+  TagChip,
+  TooltipDescription,
   TooltipLine,
   ellipsis,
   monoChars,
@@ -24,6 +28,7 @@ import { LineageDataset } from '../../types/lineage'
 import { PositionedNode } from '../../../libs/graph'
 import { TableLineageDatasetNodeData } from './nodes'
 import { connect } from 'react-redux'
+import { datasetDescription, piiColumns, piiLabel } from './columnFacts'
 import { datasetFields } from './layout'
 import { mix } from '../../layers'
 import { selectedRing, useAxisTokens } from '../../theme'
@@ -110,17 +115,24 @@ export const TableLineageDatasetNode = ({
     setSearchParams(searchParams)
   }
 
+  const description = datasetDescription(lineageDataset)
   const tooltip = (
     <div>
       <TooltipLine label='Namespace:'>
         {truncateTextFront(lineageDataset.namespace, 40)}
       </TooltipLine>
       <TooltipLine label='Name:'>{truncateTextFront(lineageDataset.name, 40)}</TooltipLine>
-      {lineageDataset.description && (
-        <TooltipLine label='Description:'>{lineageDataset.description}</TooltipLine>
-      )}
+      {description && <TooltipDescription>{description}</TooltipDescription>}
       <TooltipLine label='Updated at:'>{formatUpdatedAt(lineageDataset.updatedAt)}</TooltipLine>
       {wave && <TooltipLine label='Layer:'>{wave.tooltip}</TooltipLine>}
+      {[marks.status, marks.tag, marks.label].map(
+        (m) =>
+          m && (
+            <TooltipLine key={m.layerId} label='Layer:'>
+              {m.tooltip}
+            </TooltipLine>
+          )
+      )}
       {marks.markers.map((m) => (
         <TooltipLine key={m.layerId} label='Flag:'>
           {m.tooltip}
@@ -146,6 +158,7 @@ export const TableLineageDatasetNode = ({
   )
 
   const fields = datasetFields(lineageDataset)
+  const pii = piiColumns(lineageDataset.facets)
   const shownFields = showFields ? fields.slice(0, MAX_FIELD_ROWS) : []
   const moreFields = showFields ? fields.length - shownFields.length : 0
   const rowLine = `1px solid ${t.rowLine}`
@@ -185,7 +198,8 @@ export const TableLineageDatasetNode = ({
               gap: 8,
               padding: '6px 10px 6px 12px',
               background: wave ? mix(wave.color, t.cardHeader, 0.22) : t.cardHeader,
-              borderBottom: showFields || marks.meter ? `1px solid ${t.line}` : 'none',
+              borderBottom:
+                showFields || marks.meter || marks.label ? `1px solid ${t.line}` : 'none',
             }}
           >
             {wave && <FillAccent color={wave.color} radius='8px 0 0 0' />}
@@ -210,6 +224,7 @@ export const TableLineageDatasetNode = ({
                 title={tooltip}
               >
                 <div
+                  data-testid='dataset-name'
                   style={{
                     ...ellipsis,
                     fontFamily: t.mono,
@@ -249,15 +264,22 @@ export const TableLineageDatasetNode = ({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
+                  gap: 5,
                   color: t.muted,
                   fontSize: 10.5,
                   minWidth: 0,
                 }}
               >
+                {marks.status && <StatusDot status={marks.status} />}
                 <span style={ellipsis}>
                   {lineageDataset.namespace} · {datasetTypeOf(lineageDataset)}
                 </span>
-                {wave && <FillChip fill={wave} />}
+                {(marks.tag || wave) && (
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, flex: 'none' }}>
+                    {marks.tag && <TagChip tag={marks.tag} />}
+                    {wave && <FillChip fill={wave} />}
+                  </span>
+                )}
               </div>
             </div>
             <MQTooltip title={isCollapsed ? 'Expand' : 'Collapse'} placement='top'>
@@ -287,49 +309,104 @@ export const TableLineageDatasetNode = ({
               </IconButton>
             </MQTooltip>
           </div>
-          {marks.meter && (
-            <MeterRow
-              meter={marks.meter}
+          {(marks.meter || marks.label) && (
+            <div
+              data-testid='facts-row'
               style={{
                 height: METER_ROW_HEIGHT,
-                padding: '0 10px 0 12px',
-                background: t.meterRow,
-                borderBottom: shownFields.length ? rowLine : 'none',
-              }}
-            />
-          )}
-          {shownFields.map((field, index) => (
-            <div
-              key={field.name}
-              data-testid='field-row'
-              style={{
-                height: FIELD_ROW_HEIGHT,
                 boxSizing: 'border-box',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 8,
+                gap: 6,
                 padding: '0 10px 0 12px',
-                fontSize: 11,
-                borderTop: index > 0 ? rowLine : 'none',
+                background: t.meterRow,
+                borderBottom: shownFields.length ? rowLine : 'none',
+                fontSize: 9.5,
+                color: t.muted,
               }}
             >
-              <span style={ellipsis}>{field.name}</span>
-              {field.type && (
-                <i
-                  style={{
-                    ...ellipsis,
-                    fontStyle: 'normal',
-                    color: t.muted,
-                    fontFamily: t.mono,
-                    fontSize: 10,
-                  }}
-                >
-                  {field.type.toLowerCase()}
-                </i>
+              {marks.meter ? (
+                <MeterRow meter={marks.meter} style={{ minWidth: 0 }} />
+              ) : (
+                <span style={ellipsis}>{marks.label?.title}</span>
+              )}
+              {marks.label && (
+                <MQTooltip title={marks.label.tooltip} placement='top'>
+                  <em
+                    data-testid='size-label'
+                    style={{
+                      marginLeft: 'auto',
+                      flex: 'none',
+                      fontStyle: 'normal',
+                      fontWeight: 600,
+                      color: marks.label.color,
+                    }}
+                  >
+                    {marks.label.text}
+                  </em>
+                </MQTooltip>
               )}
             </div>
-          ))}
+          )}
+          {shownFields.map((field, index) => {
+            const kinds = pii.get(field.name.toLowerCase())
+            const row = (
+              <div
+                key={field.name}
+                data-testid='field-row'
+                style={{
+                  height: FIELD_ROW_HEIGHT,
+                  boxSizing: 'border-box',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '0 10px 0 12px',
+                  fontSize: 11,
+                  borderTop: index > 0 ? rowLine : 'none',
+                }}
+              >
+                <span style={ellipsis}>{field.name}</span>
+                {kinds && <PiiShield label={piiLabel(kinds)} />}
+                {field.type && (
+                  <i
+                    style={{
+                      ...ellipsis,
+                      marginLeft: 'auto',
+                      fontStyle: 'normal',
+                      color: t.muted,
+                      fontFamily: t.mono,
+                      fontSize: 10,
+                    }}
+                  >
+                    {field.type.toLowerCase()}
+                  </i>
+                )}
+              </div>
+            )
+            if (!field.description && !kinds) return row
+            return (
+              <MQTooltip
+                key={field.name}
+                placement='right'
+                title={
+                  <div>
+                    <TooltipLine label={field.name}>{field.type?.toLowerCase() ?? ''}</TooltipLine>
+                    {field.description && (
+                      <TooltipDescription>{field.description}</TooltipDescription>
+                    )}
+                    {kinds && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                        <PiiShield label={piiLabel(kinds)} size={13} />
+                        {piiLabel(kinds)}
+                      </div>
+                    )}
+                  </div>
+                }
+              >
+                {row}
+              </MQTooltip>
+            )
+          })}
           {moreFields > 0 && (
             <div
               data-testid='more-fields'
