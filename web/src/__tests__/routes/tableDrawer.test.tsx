@@ -108,6 +108,25 @@ describe('the table drawer with full facets (converted)', () => {
     expect(meta.textContent).toContain('status converted')
   })
 
+  it('shows the migration and the reconcile status together, as the mockup does', () => {
+    renderDrawer({ ...FULL, axisStatus: { state: 'reconciled' } })
+    const status = screen.getByTestId('drawer-status')
+    expect(status.textContent).toBe('converted · reconcile ✓')
+  })
+
+  it('shows a failed reconcile, and any other state as given, after the migration status', () => {
+    const { unmount } = renderDrawer({ ...FULL, axisStatus: { state: 'failed' } })
+    expect(screen.getByTestId('drawer-status').textContent).toBe('converted · reconcile ✗')
+    unmount()
+    renderDrawer({ ...FULL, axisStatus: { state: 'lineage' } })
+    expect(screen.getByTestId('drawer-status').textContent).toBe('converted · lineage')
+  })
+
+  it('does not repeat a state both facets give', () => {
+    renderDrawer({ ...FULL, axisStatus: { state: 'converted' } })
+    expect(screen.getByTestId('drawer-status').textContent).toBe('converted')
+  })
+
   it('opens on the DDL tab with the Oracle source highlighted in Dark+', () => {
     renderDrawer(FULL)
     expect(tab('DDL').getAttribute('aria-selected')).toBe('true')

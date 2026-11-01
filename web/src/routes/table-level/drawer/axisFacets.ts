@@ -119,6 +119,34 @@ export const readAxisMigration = (facets: unknown): AxisMigration | null => {
   }
 }
 
+/** One part of the header's status: its text, and whether it is a good or a bad outcome. */
+export interface StatusPart {
+  text: string
+  tone: 'done' | 'failed' | 'plain'
+}
+
+const RECONCILE: Record<string, StatusPart> = {
+  reconciled: { text: 'reconcile ✓', tone: 'done' },
+  failed: { text: 'reconcile ✗', tone: 'failed' },
+}
+
+/**
+ * The header's status: the conversion status of `axisMigration`, then the stage state of
+ * `axisStatus` (design §7.4 header: "conversion and reconcile status"). A reconciled or failed
+ * state reads "reconcile ✓" or "reconcile ✗", any other state is shown as given, and a state
+ * both facets give is shown once.
+ */
+export const drawerStatus = (facets: unknown, migration: AxisMigration | null): StatusPart[] => {
+  const parts: StatusPart[] = []
+  const converted = migration?.status ?? ''
+  if (converted) parts.push({ text: converted, tone: converted === 'converted' ? 'done' : 'plain' })
+  const state = str(facet(facets, 'axisStatus')?.state)
+  if (state && state !== converted) {
+    parts.push(RECONCILE[state] ?? { text: state, tone: state === 'converted' ? 'done' : 'plain' })
+  }
+  return parts
+}
+
 /** The source columns of the standard `schema` facet, else the lineage node's fields. */
 export const sourceColumns = (
   facets: unknown,

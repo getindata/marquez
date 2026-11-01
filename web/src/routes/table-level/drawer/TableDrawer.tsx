@@ -6,7 +6,9 @@ import {
   DrawerColumn,
   MigrationGap,
   MigrationRule,
+  StatusPart,
   drawerColumns,
+  drawerStatus,
   platformLabel,
   readAxisDdl,
   readAxisMigration,
@@ -445,7 +447,7 @@ const Header = ({
   dataset: LineageDataset
   marks: NodeMarks
   writers: string[]
-  status: string
+  status: StatusPart[]
   onClose: () => void
 }) => {
   const t = useAxisTokens()
@@ -500,7 +502,7 @@ const Header = ({
           ✕
         </button>
       </div>
-      {(marks.meter || writers.length > 0 || status) && (
+      {(marks.meter || writers.length > 0 || status.length > 0) && (
         <div
           data-testid='drawer-meta'
           style={{
@@ -529,11 +531,27 @@ const Header = ({
                 ` + ${writers.length - shownWriters.length} more`}
             </span>
           )}
-          {status && (
+          {status.length > 0 && (
             <span>
               status{' '}
-              <b style={{ color: status === 'converted' ? t.done : t.text, fontWeight: 600 }}>
-                {status}
+              <b data-testid='drawer-status' style={{ fontWeight: 600 }}>
+                {status.map((part, i) => (
+                  <React.Fragment key={part.text}>
+                    {i > 0 && <span style={{ color: t.muted }}> · </span>}
+                    <span
+                      style={{
+                        color:
+                          part.tone === 'done'
+                            ? t.done
+                            : part.tone === 'failed'
+                            ? t.gapText
+                            : t.text,
+                      }}
+                    >
+                      {part.text}
+                    </span>
+                  </React.Fragment>
+                ))}
               </b>
             </span>
           )}
@@ -562,8 +580,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
   const [tab, setTab] = useState<Tab>(tabs[0])
   const [view, setView] = useState<DdlView>('source')
   const marks = allMarks(catalog, 'dataset', facets)
-  const axisStatus = (facets as Record<string, any> | undefined)?.axisStatus?.state
-  const status = migration?.status || (typeof axisStatus === 'string' ? axisStatus : '')
+  const status = drawerStatus(facets, migration)
   const wide = tab === 'ddl' && view === 'side' && !!ddl && !!migration?.targetDdl
 
   return (
