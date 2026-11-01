@@ -8,7 +8,7 @@
  */
 
 export type LayerKind = 'category' | 'scale' | 'icon' | 'flag'
-export type LayerSlot = 'fill' | 'dot' | 'meter' | 'badge' | 'marker'
+export type LayerSlot = 'fill' | 'dot' | 'meter' | 'badge' | 'marker' | 'tag' | 'label' | 'status'
 export type LayerNodeKind = 'dataset' | 'job'
 
 export const CATALOG_JOB_NAME = 'axis.layers'
@@ -49,19 +49,25 @@ export interface CatalogParseResult {
 
 /** The slots each kind may draw in. */
 const KIND_SLOTS: Record<LayerKind, LayerSlot[]> = {
-  category: ['fill'],
-  scale: ['dot', 'meter'],
+  category: ['fill', 'tag', 'status'],
+  scale: ['dot', 'meter', 'label'],
   icon: ['badge'],
   flag: ['marker'],
 }
 
-/** The node kinds each slot exists on: the heat dot is a dataset header's, the badge a job tile's. */
+/**
+ * The node kinds each slot exists on: the heat dot, the zone chip (`tag`) and the size label
+ * (`label`) are a dataset card's, the badge a job tile's; the status dot is on both.
+ */
 const SLOT_NODES: Record<LayerSlot, LayerNodeKind[]> = {
   fill: ['dataset', 'job'],
   dot: ['dataset'],
   meter: ['dataset', 'job'],
   badge: ['job'],
   marker: ['dataset', 'job'],
+  tag: ['dataset'],
+  label: ['dataset'],
+  status: ['dataset', 'job'],
 }
 
 const ID_PATTERN = /^[a-z][a-z0-9_]{0,31}$/

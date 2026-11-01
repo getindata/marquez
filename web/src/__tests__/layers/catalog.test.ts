@@ -1,7 +1,7 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { DESIGN_CATALOG } from './fixtures'
+import { DESIGN_CATALOG, FULL_CATALOG } from './fixtures'
 import { catalogFromJobFacets, layerValues, parseLayerCatalog } from '../../layers'
 
 describe('parseLayerCatalog', () => {
@@ -102,6 +102,57 @@ describe('parseLayerCatalog', () => {
       layers: [{ id: 'heat', kind: 'scale', slot: 'dot', appliesTo: ['dataset', 'job'] }],
     })
     expect(catalog?.layers[0].appliesTo).toEqual(['dataset'])
+  })
+
+  it('reads the tag, label and status slots of the LAY-10 layers', () => {
+    const { catalog, problems } = parseLayerCatalog(FULL_CATALOG)
+    expect(problems).toEqual([])
+    const byId = Object.fromEntries((catalog?.layers ?? []).map((l) => [l.id, l]))
+    expect(byId.zone).toMatchObject({ kind: 'category', slot: 'tag', appliesTo: ['dataset'] })
+    expect(byId.size).toMatchObject({ kind: 'scale', slot: 'label', unit: 'bytes', scale: 'log' })
+    expect(byId.status).toMatchObject({ slot: 'status', appliesTo: ['dataset', 'job'] })
+    expect(byId.decommission).toMatchObject({ kind: 'flag', slot: 'marker' })
+  })
+
+  it('takes a category in tag or status and a scale in label, and nothing else there', () => {
+    const { catalog, problems } = parseLayerCatalog({
+      layers: [
+        { id: 'a', kind: 'scale', slot: 'tag', appliesTo: ['dataset'] },
+        { id: 'b', kind: 'category', slot: 'label', appliesTo: ['dataset'] },
+        { id: 'c', kind: 'flag', slot: 'status', appliesTo: ['dataset'] },
+        { id: 'd', kind: 'category', slot: 'tag', appliesTo: ['dataset'] },
+        { id: 'e', kind: 'scale', slot: 'label', appliesTo: ['dataset'] },
+        { id: 'f', kind: 'category', slot: 'status', appliesTo: ['dataset'] },
+      ],
+    })
+    expect(catalog?.layers.map((l) => l.id)).toEqual(['d', 'e', 'f'])
+    expect(problems).toHaveLength(3)
+  })
+
+  it('keeps the zone chip and the size label off jobs, the status dot on both', () => {
+    const { catalog } = parseLayerCatalog({
+      layers: [
+        { id: 'zone', kind: 'category', slot: 'tag', appliesTo: ['dataset', 'job'] },
+        { id: 'size', kind: 'scale', slot: 'label', appliesTo: ['dataset', 'job'] },
+        { id: 'status', kind: 'category', slot: 'status', appliesTo: ['dataset', 'job'] },
+      ],
+    })
+    expect(catalog?.layers.map((l) => l.appliesTo)).toEqual([
+      ['dataset'],
+      ['dataset'],
+      ['dataset', 'job'],
+    ])
+  })
+
+  it('refuses a second layer in the status slot', () => {
+    const { catalog, problems } = parseLayerCatalog({
+      layers: [
+        ...FULL_CATALOG.layers,
+        { id: 'reconcile', kind: 'category', slot: 'status', appliesTo: ['job'] },
+      ],
+    })
+    expect(catalog?.layers.map((l) => l.id)).not.toContain('reconcile')
+    expect(problems).toEqual([expect.stringContaining('slot status already holds layer status')])
   })
 
   it('gives no catalog for junk or an empty list', () => {
