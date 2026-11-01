@@ -63,6 +63,8 @@ export interface AxisTokens {
   link: string
   /** "applied", "converted": a done state. */
   done: string
+  /** The shield on a column that holds personal data. */
+  pii: string
   /** The table drawer's rule chips: background and text per kind. */
   tagBg: string
   tagText: string
@@ -119,6 +121,7 @@ const DARK: AxisTokens = {
   code: '#a9c7e8',
   link: '#7cc8f2',
   done: '#22c55e',
+  pii: '#f5a524',
   tagBg: '#30353e',
   tagText: '#a3a9b4',
   deterministicBg: '#1d3550',
@@ -169,6 +172,7 @@ const LIGHT: AxisTokens = {
   code: '#2f6fb3',
   link: '#2f6fb3',
   done: '#16794a',
+  pii: '#b45309',
   tagBg: '#eceef1',
   tagText: '#5c6470',
   deterministicBg: '#e1effb',
@@ -219,6 +223,7 @@ const XEBIA: AxisTokens = {
   code: '#C57DC5',
   link: '#7cc8f2',
   done: '#22c55e',
+  pii: '#f5a524',
   tagBg: '#2a2038',
   tagText: '#9a8fab',
   deterministicBg: '#13304a',

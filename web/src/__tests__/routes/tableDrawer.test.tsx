@@ -13,7 +13,15 @@ import {
   neighbourGraph,
   neighbourNode,
 } from './tableDrawer.fixtures'
-import { DESIGN_CATALOG } from '../layers/fixtures'
+import {
+  DESIGN_CATALOG,
+  FULL_CATALOG,
+  axisLayers,
+  axisPii,
+  columnLineage,
+  piiTags,
+} from '../layers/fixtures'
+import { clearFieldOriginCache } from '../../routes/table-level/columnOrigins'
 import { EDITOR_COLORS } from '../../routes/table-level/drawer/DdlCode'
 import { LayerCatalog, parseLayerCatalog } from '../../layers'
 import { LineageGraph } from '../../types/api'
@@ -50,14 +58,19 @@ const NO_TARGET = { ...AXIS_DDL, ...SCHEMA, ...LAYERS, ...migration('will_apply'
 const GRAPH_URL =
   '/lineage/dataset/oracle/dw.fact_sales?theme=xebia&layers=wave&depth=3&tableLevelNode=dataset%3Aoracle%3Adw.fact_sales'
 
-const renderNode = (node: LineageNode, lineage: LineageGraph, scheme: SchemeName = 'dark') => {
+const renderNode = (
+  node: LineageNode,
+  lineage: LineageGraph,
+  scheme: SchemeName = 'dark',
+  layerCatalog: LayerCatalog = catalog
+) => {
   const onClose = jest.fn()
   const utils = render(
     <MemoryRouter initialEntries={[GRAPH_URL]}>
       <SchemeContext.Provider
         value={{ scheme, tokens: SCHEMES[scheme], setScheme: () => undefined }}
       >
-        <TableDrawer node={node} lineage={lineage} catalog={catalog} onClose={onClose} />
+        <TableDrawer node={node} lineage={lineage} catalog={layerCatalog} onClose={onClose} />
       </SchemeContext.Provider>
     </MemoryRouter>
   )
@@ -477,5 +490,136 @@ describe('the table-level drawer host', () => {
     host('job:oracle:etl.load_sales')
     expect(screen.queryByTestId('table-drawer')).toBeNull()
     expect(screen.getByTestId('job-drawer')).toBeTruthy()
+  })
+})
+
+describe('descriptions, PII and the LAY-10 layers in the drawer', () => {
+  const DESCRIBED = {
+    ...SCHEMA,
+    documentation: { description: 'Sales facts, one row per receipt line.' },
+    schema: {
+      fields: [
+        { name: 'sale_id', type: 'NUMBER', description: 'Key of the sale.' },
+        { name: 'email', type: 'VARCHAR2' },
+      ],
+    },
+    ...piiTags({ email: 'email' }),
+  }
+
+  it("shows the table's description under its name", () => {
+    renderDrawer(DESCRIBED)
+    expect(screen.getByTestId('drawer-description').textContent).toBe(
+      'Sales facts, one row per receipt line.'
+    )
+  })
+
+  it('has no description line without one', () => {
+    renderDrawer({ ...SCHEMA })
+    expect(screen.queryByTestId('drawer-description')).toBeNull()
+  })
+
+  it("shows each column's description under its name, and marks the PII column with its kind", () => {
+    renderDrawer(DESCRIBED)
+    const rows = screen.getAllByTestId('column-row')
+    expect(within(rows[0]).getByTestId('column-description').textContent).toBe('Key of the sale.')
+    expect(within(rows[0]).queryByTestId('pii-marker')).toBeNull()
+    expect(within(rows[1]).queryByTestId('column-description')).toBeNull()
+    expect(within(rows[1]).getByTestId('pii-chip').textContent).toBe('email')
+    expect(within(rows[1]).getByTestId('pii-marker').getAttribute('aria-label')).toBe(
+      'Personal data: email'
+    )
+  })
+
+  it("shows the kind, the agent's rationale and the source column when hovering the PII mark", async () => {
+    clearFieldOriginCache()
+    const fetchMock = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            columnLineage({ 'dw.fact_sales.email': ['crm.contacts.mail', 'web.users.email'] })
+          ),
+      } as Response)
+    )
+    global.fetch = fetchMock as unknown as typeof fetch
+    renderDrawer({ ...DESCRIBED, ...axisPii({ email: ['email', 'Comment: the email address.'] }) })
+    expect(fetchMock).not.toHaveBeenCalled()
+    const row = screen.getAllByTestId('column-row')[1]
+    fireEvent.mouseOver(within(row).getByTestId('pii-chip'))
+    const tip = await screen.findByRole('tooltip')
+    expect(tip.textContent).toContain('Personal data: email')
+    expect(within(tip).getByTestId('pii-rationale').textContent).toBe('Comment: the email address.')
+    expect((await within(tip).findByTestId('pii-source')).textContent).toBe(
+      'from contacts.mail, users.email'
+    )
+    expect(String(fetchMock.mock.calls[0][0])).toContain('nodeId=dataset%3Aoracle%3Adw.fact_sales')
+  })
+
+  describe('malformed facets and untrusted text', () => {
+    const HTML = '<img src=x onerror="alert(1)">'
+
+    it.each([
+      [{ documentation: 'x', tags: 'x', axisPii: 'x' }],
+      [{ documentation: null, tags: { tags: 'x' }, axisPii: { columns: 'x' } }],
+      [
+        {
+          documentation: { description: { html: HTML } },
+          tags: { tags: [null, 1, { key: 'pii', field: 7 }, { key: 1, field: 'sale_id' }] },
+          axisPii: { columns: [null, { column: 'sale_id', rationale: 9 }] },
+        },
+      ],
+    ])('draws the header and the Columns tab from malformed facets: %j', (bad) => {
+      renderDrawer({ ...SCHEMA, ...bad })
+      expect(screen.queryByTestId('drawer-description')).toBeNull()
+      fireEvent.click(tab('Columns'))
+      expect(screen.getAllByTestId('column-row')).toHaveLength(4)
+      expect(screen.queryByTestId('pii-chip')).toBeNull()
+    })
+
+    it('writes HTML-like descriptions, PII kinds and rationales as text', async () => {
+      clearFieldOriginCache()
+      global.fetch = jest.fn(() =>
+        Promise.resolve({ ok: false, status: 404 } as Response)
+      ) as unknown as typeof fetch
+      renderDrawer({
+        ...SCHEMA,
+        documentation: { description: HTML },
+        schema: { fields: [{ name: 'email', type: 'VARCHAR2', description: `${HTML} column` }] },
+        ...piiTags({ email: HTML }),
+        ...axisPii({ email: [HTML, `${HTML} rationale`] }),
+      })
+      expect(screen.getByTestId('drawer-description').textContent).toBe(HTML)
+      fireEvent.click(tab('Columns'))
+      const row = screen.getAllByTestId('column-row')[0]
+      expect(within(row).getByTestId('column-description').textContent).toBe(`${HTML} column`)
+      expect(within(row).getByTestId('pii-chip').textContent).toBe(HTML)
+      fireEvent.mouseOver(within(row).getByTestId('pii-chip'))
+      const tip = await screen.findByRole('tooltip')
+      expect(within(tip).getByTestId('pii-rationale').textContent).toBe(`${HTML} rationale`)
+      expect(document.querySelectorAll('img')).toHaveLength(0)
+    })
+  })
+
+  it('keeps the descriptions when the migration maps the columns', () => {
+    renderDrawer({ ...DESCRIBED, ...migration('applied') })
+    fireEvent.click(tab('Columns'))
+    const row = screen
+      .getAllByTestId('column-row')
+      .find((r) => r.textContent?.startsWith('sale_id'))!
+    expect(within(row).getByTestId('column-description').textContent).toBe('Key of the sale.')
+  })
+
+  it('shows the zone chip, the size and the status dot in the header', () => {
+    const full = parseLayerCatalog(FULL_CATALOG).catalog as LayerCatalog
+    const { node, lineage } = graphWith({
+      ...SCHEMA,
+      ...axisLayers({ wave: 1, zone: 'core', size: 1288490188, status: 'reconciled' }),
+    })
+    renderNode(node, lineage, 'dark', full)
+    expect(screen.getByTestId('tag-chip').textContent).toBe('core')
+    expect(screen.getByTestId('size-label').textContent).toBe('1.2 GB')
+    expect(screen.getByTestId('status-dot').style.background).toBe('rgb(34, 197, 94)')
+    // with no migration or reconcile facet, the status line is the layer's
+    expect(screen.getByTestId('drawer-status').textContent).toBe('reconciled')
   })
 })

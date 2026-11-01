@@ -4,6 +4,8 @@
 import { HEAT_GRADIENT } from './colorScale'
 import { LayerDefinition, LayerSlot } from './catalog'
 import { OrchestratorBadge } from './VendorMarks'
+import { formatLayerAmount } from './nodeMarks'
+import { mix } from './colorScale'
 import { useAxisTokens } from '../theme'
 import Box from '@mui/material/Box'
 import React, { useEffect } from 'react'
@@ -14,6 +16,9 @@ const SLOT_TEXT: Record<LayerSlot, string> = {
   meter: 'heat meter',
   badge: 'badge',
   marker: 'marker',
+  tag: 'chip',
+  label: 'label',
+  status: 'status dot',
 }
 
 const compact = (n: number) =>
@@ -27,13 +32,42 @@ const Legend = ({ layer }: { layer: LayerDefinition }) => {
   const small = { fontSize: 10.5, color: t.muted }
   switch (layer.kind) {
     case 'category':
+      if (layer.slot === 'tag') {
+        // outlined chips, as on the cards
+        return (
+          <Box display='flex' flexWrap='wrap' gap='5px 6px' mt='7px' sx={small}>
+            {layer.legend.map((e) => (
+              <span
+                key={String(e.value)}
+                data-testid='legend-tag'
+                style={{
+                  padding: '0 6px',
+                  borderRadius: 10,
+                  whiteSpace: 'nowrap',
+                  border: `1px solid ${e.color ?? t.muted}`,
+                  color: t.text,
+                  background: mix(e.color ?? t.muted, t.panelEntry, 0.18),
+                }}
+              >
+                {e.label}
+              </span>
+            ))}
+          </Box>
+        )
+      }
       return (
         <Box display='flex' flexWrap='wrap' gap='5px 10px' mt='7px' sx={small}>
           {layer.legend.map((e) => (
             <Box key={String(e.value)} display='inline-flex' alignItems='center' gap='4px'>
               <Box
                 component='i'
-                sx={{ width: 10, height: 10, borderRadius: '2px', background: e.color }}
+                data-testid={layer.slot === 'status' ? 'legend-status' : undefined}
+                style={{ background: e.color }}
+                sx={
+                  layer.slot === 'status'
+                    ? { width: 8, height: 8, borderRadius: '50%' }
+                    : { width: 10, height: 10, borderRadius: '2px' }
+                }
               />
               <span style={{ whiteSpace: 'nowrap' }}>{e.label}</span>
             </Box>
@@ -46,6 +80,14 @@ const Legend = ({ layer }: { layer: LayerDefinition }) => {
       const middle = layer.window
         ? `${layer.window}${layer.scale === 'log' ? ', log' : ''}`
         : appliesText(layer)
+      // a label shows an amount (bytes, rows): its range reads the same
+      const ends =
+        layer.slot === 'label'
+          ? [formatLayerAmount(min, layer.unit), `${formatLayerAmount(max, layer.unit)}+`]
+          : [
+              `${compact(min)}${layer.unit ? ` ${layer.unit}` : ''}`,
+              `${compact(max)}${max > 1 ? '+' : ''}`,
+            ]
       return (
         <>
           <Box sx={{ height: 8, borderRadius: '4px', mt: '7px', background: HEAT_GRADIENT }} />
@@ -55,15 +97,9 @@ const Legend = ({ layer }: { layer: LayerDefinition }) => {
             mt='3px'
             sx={{ ...small, fontSize: 10 }}
           >
-            <span>
-              {compact(min)}
-              {layer.unit ? ` ${layer.unit}` : ''}
-            </span>
+            <span>{ends[0]}</span>
             <span>{middle}</span>
-            <span>
-              {compact(max)}
-              {max > 1 ? '+' : ''}
-            </span>
+            <span>{ends[1]}</span>
           </Box>
         </>
       )
@@ -81,7 +117,18 @@ const Legend = ({ layer }: { layer: LayerDefinition }) => {
       )
     default:
       return (
-        <Box mt='7px' sx={small}>
+        <Box mt='7px' display='flex' alignItems='center' gap='7px' sx={small}>
+          <Box
+            component='i'
+            data-testid='legend-marker'
+            sx={{
+              flex: 'none',
+              width: 7,
+              height: 7,
+              transform: 'rotate(45deg)',
+              background: t.accent,
+            }}
+          />
           a mark beside the name of each flagged {appliesText(layer).replace('tables', 'table')}
         </Box>
       )
@@ -95,15 +142,22 @@ interface LayersPanelProps {
   onClose: () => void
 }
 
-/** The floating Layers card over the graph's right edge; Escape closes it. */
+/**
+ * The floating Layers card over the graph's right edge. While it is open, Escape is its own,
+ * wherever focus is (its toolbar button keeps focus on open): it closes the panel and marks the
+ * key handled, so the drawer under it stays open.
+ */
 export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelProps) => {
   const t = useAxisTokens()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      onClose()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // the capture phase on window runs before any document listener, the drawer's included
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
 
   return (
@@ -145,6 +199,7 @@ export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelPr
       {layers.map((layer) => (
         <Box
           key={layer.id}
+          data-testid='layer-entry'
           sx={{
             border: `1px solid ${t.line}`,
             borderRadius: '8px',

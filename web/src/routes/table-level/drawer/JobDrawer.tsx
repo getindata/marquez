@@ -5,7 +5,7 @@ import { AxisTokens, useAxisTokens } from '../../../theme'
 import { BackButton, CloseButton, DrawerTabs, useDrawerTab } from './DrawerParts'
 import { DRAWER_WIDE } from './TableDrawer'
 import { DatasetLinks } from './LineageTab'
-import { FillChip, MeterRow, nodeUrl, tailFit } from '../cardParts'
+import { FillChip, MeterRow, StatusDot, nodeUrl, tailFit } from '../cardParts'
 import { JobCode, jobCodeBlocks } from './JobCode'
 import { JobTypeTile, LayerCatalog, OrchestratorBadge, jobTypeOf } from '../../../layers'
 import { LineageGraph, Run } from '../../../types/api'
@@ -142,6 +142,14 @@ const Header = ({
           latest run <RunState state={latest?.state} />
           {latest && <span>{runTime(latest)}</span>}
         </span>
+        {marks.status && (
+          <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}>
+            status <StatusDot status={marks.status} />
+            <b data-testid='drawer-status' style={{ fontWeight: 600, color: t.text }}>
+              {marks.status.label}
+            </b>
+          </span>
+        )}
       </div>
     </div>
   )

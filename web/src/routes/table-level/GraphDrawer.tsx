@@ -15,8 +15,8 @@ import TableLevelDrawer from './TableLevelDrawer'
  * The table-level view's drawer: the open node's table or job drawer, on the right. It is not
  * modal (MUI's persistent variant): there is no backdrop over the graph, so a card click with the
  * drawer open reaches the card and opens that node, with Back to the one before. The drawer
- * closes from its ✕ or Escape (not an Escape inside another dialog, such as the Layers panel);
- * a click on the graph's background leaves it open.
+ * closes from its ✕ or Escape (not an Escape another handler took first, such as the open Layers
+ * panel's); a click on the graph's background leaves it open.
  */
 export const GraphDrawer = ({ catalog }: { catalog: LayerCatalog | null }) => {
   const t = useAxisTokens()
@@ -26,9 +26,8 @@ export const GraphDrawer = ({ catalog }: { catalog: LayerCatalog | null }) => {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      // an Escape inside another dialog (the Layers panel) is that dialog's to close
-      const target = e.target instanceof Element ? e.target : null
-      if (e.key === 'Escape' && !target?.closest('[role="dialog"]')) closeDrawer()
+      // an Escape the open Layers panel took (in the capture phase) is not the drawer's
+      if (e.key === 'Escape' && !e.defaultPrevented) closeDrawer()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)

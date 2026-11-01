@@ -1,7 +1,7 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
-import { DESIGN_CATALOG, axisLayers } from '../layers/fixtures'
+import { DESIGN_CATALOG, FULL_CATALOG, axisLayers } from '../layers/fixtures'
 import { LayerCatalog, LayerView, parseLayerCatalog } from '../../layers'
 import { LineageGraph } from '../../types/api'
 import { SCHEMES } from '../../theme/schemes'
@@ -102,6 +102,27 @@ describe('createElkNodes', () => {
     expect(s['job:oracle:report']).toEqual([180, 52])
   })
 
+  it('adds the meter row for a size label too, once with complexity', () => {
+    const full = parseLayerCatalog(FULL_CATALOG).catalog as LayerCatalog
+    const sized = {
+      graph: graph.graph.map((n) =>
+        n.id === 'dataset:oracle:fact' || n.id === 'dataset:oracle:src'
+          ? { ...n, data: { ...n.data, facets: axisLayers({ size: 4096, complexity: 0.2 }) } }
+          : n
+      ),
+    } as LineageGraph
+    const at = (active: string[]) =>
+      Object.fromEntries(
+        createElkNodes(sized, SELECTED, false, true, null, {
+          catalog: full,
+          active: new Set(active),
+        }).nodes.map((n) => [n.id, n.height])
+      )
+    expect(at(['size'])['dataset:oracle:src']).toBe(2 + 46 + 20 + 2 * 22)
+    expect(at(['size', 'complexity'])['dataset:oracle:src']).toBe(2 + 46 + 20 + 2 * 22)
+    expect(at([])['dataset:oracle:src']).toBe(2 + 46 + 2 * 22)
+  })
+
   it('hides rows when compact or collapsed', () => {
     expect(sizes(undefined, true)['dataset:oracle:fact']).toEqual([190, 48])
     expect(sizes(undefined, false, 'dataset:oracle:fact')['dataset:oracle:fact']).toEqual([190, 48])
@@ -163,5 +184,20 @@ describe('datasetFields', () => {
       { name: 'x', type: undefined },
     ])
     expect(datasetFields({ fields: undefined, facets: undefined } as any)).toEqual([])
+  })
+
+  it("keeps each column's description, from Marquez's fields or the schema facet", () => {
+    expect(
+      datasetFields({
+        fields: [{ name: 'id', type: 'NUMBER', description: 'Key.' }],
+        facets: {},
+      } as any)
+    ).toEqual([{ name: 'id', type: 'NUMBER', description: 'Key.' }])
+    expect(
+      datasetFields({
+        fields: [],
+        facets: { schema: { fields: [{ name: 'id', type: 'NUMBER', description: 'Key.' }] } },
+      } as any)
+    ).toEqual([{ name: 'id', type: 'NUMBER', description: 'Key.' }])
   })
 })

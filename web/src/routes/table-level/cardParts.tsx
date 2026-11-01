@@ -4,6 +4,7 @@
 import { NODE_OVERHANG } from './sizes'
 import { NodeMarks, mix } from '../../layers'
 import { useAxisTokens } from '../../theme'
+import MQTooltip from '../../components/core/tooltip/MQTooltip'
 import React, { CSSProperties, ReactNode } from 'react'
 
 /**
@@ -187,3 +188,118 @@ export const TooltipLine = ({ label, children }: { label: string; children: Reac
     </div>
   )
 }
+
+/**
+ * The zone chip (`tag` slot): outlined in the zone colour, so it never reads as the wave. With
+ * `maxWidth` (on the 190px card) a longer zone ends in an ellipsis; the tooltip has it whole.
+ */
+export const TagChip = ({
+  tag,
+  maxWidth,
+}: {
+  tag: NonNullable<NodeMarks['tag']>
+  maxWidth?: number
+}) => {
+  const t = useAxisTokens()
+  return (
+    <span
+      data-testid='tag-chip'
+      style={{
+        ...(maxWidth
+          ? {
+              flex: '0 1 auto',
+              minWidth: 0,
+              maxWidth,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }
+          : { flex: 'none' }),
+        fontSize: 10,
+        lineHeight: '12px',
+        padding: '0 5px',
+        borderRadius: 10,
+        whiteSpace: 'nowrap',
+        border: `1px solid ${tag.color}`,
+        color: t.text,
+        background: mix(tag.color, t.card, 0.18),
+      }}
+    >
+      {tag.text}
+    </span>
+  )
+}
+
+/**
+ * The status dot (`status` slot): 8px in the status colour. It has its own tooltip unless it
+ * sits inside a card that has one (a job's), which then lists the status.
+ */
+export const StatusDot = ({
+  status,
+  ownTooltip = true,
+}: {
+  status: NonNullable<NodeMarks['status']>
+  ownTooltip?: boolean
+}) => {
+  const dot = (
+    <span
+      data-testid='status-dot'
+      aria-label={status.tooltip}
+      style={{
+        flex: 'none',
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        background: status.color,
+      }}
+    />
+  )
+  return ownTooltip ? (
+    <MQTooltip title={status.tooltip} placement='top'>
+      {dot}
+    </MQTooltip>
+  ) : (
+    dot
+  )
+}
+
+/** The PII marker on a column row: a small shield, the kind in its label and the row tooltip. */
+export const PiiShield = ({ label, size = 11 }: { label: string; size?: number }) => {
+  const t = useAxisTokens()
+  return (
+    <svg
+      data-testid='pii-marker'
+      role='img'
+      aria-label={label}
+      width={size}
+      height={size}
+      viewBox='0 0 16 16'
+      style={{ flex: 'none', display: 'block' }}
+    >
+      <path
+        d='M8 1.2 2.5 3.3v4.2c0 3.4 2.3 6.2 5.5 7.3 3.2-1.1 5.5-3.9 5.5-7.3V3.3z'
+        fill={mix(t.pii, t.card, 0.3)}
+        stroke={t.pii}
+        strokeWidth='1.4'
+        strokeLinejoin='round'
+      />
+      <path
+        d='M5.6 8.1 7.3 9.8l3.2-3.4'
+        fill='none'
+        stroke={t.card}
+        strokeWidth='1.5'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      />
+    </svg>
+  )
+}
+
+/** A description in a tooltip: wrapped prose, not a right-aligned value. */
+export const TooltipDescription = ({ children }: { children: ReactNode }) => (
+  <div
+    data-testid='tooltip-description'
+    style={{ maxWidth: 380, margin: '6px 0', fontSize: 13, lineHeight: 1.45, whiteSpace: 'normal' }}
+  >
+    {children}
+  </div>
+)

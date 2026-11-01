@@ -57,6 +57,8 @@ export interface DrawerColumn {
   source: string
   target?: string
   exact?: boolean
+  /** The column's comment (the schema field's `description`), when it has one. */
+  description?: string
 }
 
 type Facets = Record<string, unknown>
@@ -150,18 +152,24 @@ export const drawerStatus = (facets: unknown, migration: AxisMigration | null): 
   return parts
 }
 
+const describe = (v: unknown) => str(v).trim() || undefined
+
 /** The source columns of the standard `schema` facet, else the lineage node's fields. */
 export const sourceColumns = (
   facets: unknown,
-  fields: { name: string; type: string | null }[] = []
+  fields: { name: string; type: string | null; description?: string | null }[] = []
 ): DrawerColumn[] => {
   const schema = facet(facets, 'schema')
   const given = list(schema?.fields)
     .filter(isObject)
     .filter((c) => str(c.name))
-    .map((c) => ({ name: str(c.name), source: str(c.type) }))
+    .map((c) => ({ name: str(c.name), source: str(c.type), description: describe(c.description) }))
   if (given.length) return given
-  return fields.map((c) => ({ name: c.name, source: c.type ?? '' }))
+  return fields.map((c) => ({
+    name: c.name,
+    source: c.type ?? '',
+    description: describe(c.description),
+  }))
 }
 
 /**
@@ -174,8 +182,9 @@ export const drawerColumns = (
 ): DrawerColumn[] => {
   if (!migration || !migration.columns.length) return source
   const mapped = new Set(migration.columns.map((c) => c.name.toLowerCase()))
+  const described = new Map(source.map((c) => [c.name.toLowerCase(), c.description]))
   return [
-    ...migration.columns.map((c) => ({ ...c })),
+    ...migration.columns.map((c) => ({ ...c, description: described.get(c.name.toLowerCase()) })),
     ...source.filter((c) => !mapped.has(c.name.toLowerCase())),
   ]
 }

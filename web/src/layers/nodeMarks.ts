@@ -25,6 +25,12 @@ export interface NodeMarks {
   meter?: { layerId: string; label: string; color: string; fraction: number; text: string }
   /** `badge`: the white disc on a job tile's corner; `icon` is absent for an unknown value. */
   badge?: { layerId: string; icon?: string; label: string; tooltip: string }
+  /** `tag`: the outlined chip on a dataset's second line (the data zone). */
+  tag?: { layerId: string; color: string; text: string; tooltip: string }
+  /** `label`: an amount on the dataset's meter row (the table size), in the heat-map colour. */
+  label?: { layerId: string; color: string; text: string; title: string; tooltip: string }
+  /** `status`: the small dot leading the second line of a dataset or a job (migration status). */
+  status?: { layerId: string; color: string; label: string; tooltip: string }
   /** `marker`: small marks beside the name, for flags. */
   markers: { layerId: string; tooltip: string }[]
 }
@@ -39,12 +45,65 @@ const humanId = (id: string) => {
 export const formatLayerNumber = (n: number, max = 1) =>
   max <= 1 ? n.toFixed(2) : Math.round(n).toLocaleString('en-US')
 
+const SI = ['', 'k', 'M', 'B', 'T']
+const BYTES = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+
+/** One decimal under 10, none from 10 up: 1.5, 12, 840. */
+const short = (v: number) => (v >= 10 ? `${Math.round(v)}` : `${Number(v.toFixed(1))}`)
+
+/**
+ * An amount for a `label` slot: bytes in binary units (`840 MB`, `1.2 GB`), anything else
+ * compact with its unit (`84k rows`, `1.3M rows`).
+ */
+export const formatLayerAmount = (n: number, unit?: string) => {
+  const isBytes = unit === 'bytes' || unit === 'B'
+  const [base, names] = isBytes ? [1024, BYTES] : [1000, SI]
+  let v = Math.abs(n)
+  let i = 0
+  while (v >= base && i < names.length - 1 && Number(short(v)) >= base) {
+    v /= base
+    i += 1
+  }
+  const amount = `${n < 0 ? '-' : ''}${i === 0 ? Math.round(v) : short(v)}`
+  if (isBytes) return `${amount} ${names[i]}`
+  return `${amount}${names[i]}${unit ? ` ${unit}` : ''}`
+}
+
 const withDetail = (text: string, v: LayerValue) =>
   [text, v.detail, v.asOf ? `as of ${v.asOf}` : undefined].filter(Boolean).join(' · ')
 
 const resolve = (layer: LayerDefinition, v: LayerValue, marks: NodeMarks) => {
   const entry = layer.legend.find((e) => sameValue(e.value, v.value))
   switch (layer.slot) {
+    case 'tag':
+      marks.tag = {
+        layerId: layer.id,
+        color: entry?.color ?? NEUTRAL_CATEGORY,
+        text: entry?.label ?? String(v.value),
+        tooltip: withDetail(`${layer.title}: ${entry?.label ?? v.value}`, v),
+      }
+      return
+    case 'status':
+      marks.status = {
+        layerId: layer.id,
+        color: entry?.color ?? NEUTRAL_CATEGORY,
+        label: entry?.label ?? String(v.value),
+        tooltip: withDetail(`${layer.title}: ${entry?.label ?? v.value}`, v),
+      }
+      return
+    case 'label': {
+      const n = typeof v.value === 'number' ? v.value : Number(v.value)
+      if (!Number.isFinite(n)) return
+      const text = formatLayerAmount(n, layer.unit)
+      marks.label = {
+        layerId: layer.id,
+        color: scaleColor(layer, n),
+        text,
+        title: layer.title.toLowerCase(),
+        tooltip: withDetail(`${layer.title}: ${text}`, v),
+      }
+      return
+    }
     case 'fill':
       marks.fill = {
         layerId: layer.id,

@@ -70,18 +70,29 @@ export const findUpstreamNodes = (
 }
 
 /**
- * A dataset's columns: Marquez's `fields`, else the standard `schema` facet of the node's
- * `data.facets` (the fork's lineage response); none when neither is there.
+ * A dataset's columns with their descriptions: Marquez's `fields`, else the standard `schema`
+ * facet of the node's `data.facets` (the fork's lineage response); none when neither is there.
  */
-export const datasetFields = (dataset: LineageDataset): { name: string; type?: string }[] => {
+export const datasetFields = (
+  dataset: LineageDataset
+): { name: string; type?: string; description?: string }[] => {
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined)
   if (dataset.fields?.length) {
-    return dataset.fields.map((f) => ({ name: f.name, type: f.type ?? undefined }))
+    return dataset.fields.map((f) => ({
+      name: f.name,
+      type: f.type ?? undefined,
+      description: text(f.description),
+    }))
   }
   const schema = (dataset.facets as Record<string, any> | undefined)?.schema
   if (!Array.isArray(schema?.fields)) return []
   return schema.fields
     .filter((f: any) => f && typeof f.name === 'string')
-    .map((f: any) => ({ name: f.name, type: typeof f.type === 'string' ? f.type : undefined }))
+    .map((f: any) => ({
+      name: f.name,
+      type: typeof f.type === 'string' ? f.type : undefined,
+      description: text(f.description),
+    }))
 }
 
 /**
@@ -176,7 +187,8 @@ export const createElkNodes = (
         height: datasetHeight({
           fieldCount: datasetFields(data).length,
           showFields,
-          hasMeter: !!marks.meter,
+          // the meter row holds the complexity meter and the size label
+          hasMeter: !!marks.meter || !!marks.label,
         }),
         data: {
           dataset: data,
