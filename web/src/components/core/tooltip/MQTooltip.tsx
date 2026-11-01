@@ -39,7 +39,8 @@ const MQTooltip: React.FC<MqToolTipProps> = ({ title, onOpen, onClose, children,
         tooltip: {
           sx: {
             backgroundColor: `${darken(theme.palette.background.paper, 0.1)}`,
-            color: theme.palette.common.white,
+            // the scheme's text colour: white was unreadable on Light's pale tooltip
+            color: theme.palette.text.primary,
             border: `1px solid ${theme.palette.secondary.main}`,
             maxWidth: '600px',
             fontSize: 14,
