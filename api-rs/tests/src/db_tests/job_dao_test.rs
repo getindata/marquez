@@ -4,7 +4,7 @@ use crate::common::TestDb;
 use crate::fixtures;
 use crate::generators;
 use chrono::Utc;
-use marquez_api::db::{job, tag};
+use marquez_api::db::{facets, job, tag};
 use sqlx::Executor;
 use uuid::Uuid;
 
@@ -446,5 +446,61 @@ async fn find_job_by_alias_returns_tags() {
         "tags should include '{}' when queried by alias, got {:?}",
         tag_name,
         tags
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Facets of a job version pushed more than once
+// ---------------------------------------------------------------------------
+
+/// A job re-pushed with the same version keeps every facet row of that
+/// version. The facets array is merged "last wins", so it must be ordered by
+/// `lineage_event_time` ascending, whatever order the rows were stored in.
+#[tokio::test]
+async fn find_job_by_name_with_facets_orders_facets_by_event_time() {
+    let db = TestDb::new().await;
+    let ns = fixtures::create_namespace(&db.pool).await;
+    let job_row = fixtures::create_job(&db.pool, &ns).await;
+    let version = fixtures::create_job_version(&db.pool, &job_row).await;
+    job::update_version(&db.pool, job_row.uuid, Utc::now(), version.uuid)
+        .await
+        .unwrap();
+
+    let older = Utc::now() - chrono::Duration::hours(1);
+    let newer = Utc::now();
+    // Stored newest first, so storage order and event order disagree.
+    for (event_time, layers) in [(newer, vec!["wave", "orchestrator"]), (older, vec!["wave"])] {
+        let facet = serde_json::json!({ "catalog": { "layers": layers } });
+        facets::insert_job_facet_for_version(
+            &db.pool,
+            Utc::now(),
+            job_row.uuid,
+            version.uuid,
+            event_time,
+            "catalog",
+            &facet,
+        )
+        .await
+        .unwrap();
+    }
+
+    let row = job::find_job_by_name_with_facets(&db.pool, &ns.name, &job_row.name)
+        .await
+        .unwrap()
+        .expect("job found");
+    let layers: Vec<serde_json::Value> = row
+        .facets
+        .expect("facets")
+        .as_array()
+        .expect("facets array")
+        .iter()
+        .map(|f| f["catalog"]["layers"].clone())
+        .collect();
+    assert_eq!(
+        layers,
+        vec![
+            serde_json::json!(["wave"]),
+            serde_json::json!(["wave", "orchestrator"])
+        ]
     );
 }
