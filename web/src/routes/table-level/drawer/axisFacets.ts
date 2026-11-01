@@ -13,7 +13,10 @@ export interface AxisDdl {
   text: string
 }
 
-export type RuleState = 'will_apply' | 'applied'
+/** A rule's state; `unknown` when the facet gives none or one this UI does not know. */
+export type RuleState = 'will_apply' | 'applied' | 'unknown'
+
+const ruleState = (v: unknown): RuleState => (v === 'applied' || v === 'will_apply' ? v : 'unknown')
 
 export interface MigrationRule {
   id: string
@@ -91,7 +94,7 @@ export const readAxisMigration = (facets: unknown): AxisMigration | null => {
         title: str(r.title),
         effect: str(r.effect),
         references: list(r.references).map(str).filter(Boolean),
-        state: r.state === 'applied' ? 'applied' : 'will_apply',
+        state: ruleState(r.state),
       })
     )
   const columns = list(f.columns)

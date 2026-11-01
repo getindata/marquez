@@ -53,6 +53,7 @@ const TAB_LABELS: Record<Tab, string> = {
 const STATE_LABELS: Record<MigrationRule['state'], string> = {
   will_apply: 'will apply',
   applied: 'applied',
+  unknown: 'unknown',
 }
 
 /** The real jobs that write a dataset: its in-edges, without the table's own (DDL) job. */
@@ -167,9 +168,10 @@ export const RuleCard = ({ rule }: { rule: MigrationRule }) => {
         )}
         <span
           data-testid='rule-state'
+          title={rule.state === 'unknown' ? 'The facet gives no known state' : undefined}
           style={{
             marginLeft: 'auto',
-            fontWeight: 600,
+            fontWeight: rule.state === 'unknown' ? 400 : 600,
             color: rule.state === 'applied' ? t.done : t.muted,
           }}
         >
@@ -237,10 +239,13 @@ const RulesSection = ({ migration }: { migration: AxisMigration }) => {
   const t = useAxisTokens()
   const { rules, gaps } = migration
   if (!rules.length && !gaps.length) return null
+  const known = rules.filter((r) => r.state !== 'unknown')
+  const unknown = rules.length - known.length
   const count = [
-    rules.length
-      ? `${rules.length} ${rules.every((r) => r.state === 'applied') ? 'applied' : 'apply'}`
+    known.length
+      ? `${known.length} ${known.every((r) => r.state === 'applied') ? 'applied' : 'apply'}`
       : '',
+    unknown ? `${unknown} unknown` : '',
     gaps.length ? plural(gaps.length, 'gap', 'gaps') : '',
   ]
     .filter(Boolean)

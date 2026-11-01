@@ -87,6 +87,30 @@ describe('facet readers', () => {
     expect(m).toMatchObject({ target: 'databricks', rules: [], columns: [], gaps: [] })
   })
 
+  it('read a rule state other than applied or will_apply as unknown, never as will apply', () => {
+    const rule = (state: unknown) => ({ id: 'r', state })
+    const m = readAxisMigration({
+      axisMigration: {
+        rules: [
+          rule('applied'),
+          rule('will_apply'),
+          rule(undefined),
+          rule('APPLIED!'),
+          rule(3),
+          { id: 'no state' },
+        ],
+      },
+    })
+    expect(m?.rules.map((r) => r.state)).toEqual([
+      'applied',
+      'will_apply',
+      'unknown',
+      'unknown',
+      'unknown',
+      'unknown',
+    ])
+  })
+
   it('split an effect at its arrow', () => {
     expect(splitEffect('A (x) → B (x)')).toEqual(['A (x)', 'B (x)'])
     expect(splitEffect('dropped')).toBeNull()
@@ -217,6 +241,18 @@ describe('the table drawer with full facets (converted)', () => {
     const { onClose } = renderDrawer(FULL)
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('a rule of unknown state', () => {
+  it('is shown as unknown, in the neutral colour, and the count does not call it applied', () => {
+    const facets = { ...FULL, ...migration('applied') }
+    facets.axisMigration.rules[1] = { ...facets.axisMigration.rules[1], state: 'bogus' }
+    renderDrawer(facets)
+    const states = screen.getAllByTestId('rule-state')
+    expect(states.map((s) => s.textContent)).toEqual(['applied', 'unknown'])
+    expect(states[1].style.color).not.toBe(states[0].style.color)
+    expect(screen.getByTestId('rules').textContent).not.toContain('2 applied')
   })
 })
 
