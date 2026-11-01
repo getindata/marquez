@@ -142,15 +142,22 @@ interface LayersPanelProps {
   onClose: () => void
 }
 
-/** The floating Layers card over the graph's right edge; Escape closes it. */
+/**
+ * The floating Layers card over the graph's right edge. While it is open, Escape is its own,
+ * wherever focus is (its toolbar button keeps focus on open): it closes the panel and marks the
+ * key handled, so the drawer under it stays open.
+ */
 export const LayersPanel = ({ layers, active, onToggle, onClose }: LayersPanelProps) => {
   const t = useAxisTokens()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      onClose()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // the capture phase on window runs before any document listener, the drawer's included
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
 
   return (

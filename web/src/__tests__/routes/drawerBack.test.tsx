@@ -52,6 +52,7 @@ const Page = () => {
   const [depth, setDepth] = React.useState(3)
   const [isCompact, setIsCompact] = React.useState(false)
   const [isFull, setIsFull] = React.useState(false)
+  const [layersOpen, setLayersOpen] = React.useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const lineage = graph()
@@ -100,15 +101,21 @@ const Page = () => {
         setIsCompact={setIsCompact}
         isFull={isFull}
         setIsFull={setIsFull}
+        showLayers
+        layersOpen={layersOpen}
+        onToggleLayers={() => setLayersOpen((open) => !open)}
       />
       <SchemeButton />
-      {/* the view's real Layers panel, which closes itself on Escape */}
-      <LayersPanel
-        layers={catalog.layers}
-        active={new Set<string>()}
-        onToggle={() => undefined}
-        onClose={() => undefined}
-      />
+      {/* the view's real Layers panel, mounted while open as TableLevel mounts it; it closes
+          itself on Escape */}
+      {layersOpen && (
+        <LayersPanel
+          layers={catalog.layers}
+          active={new Set<string>()}
+          onToggle={() => undefined}
+          onClose={() => setLayersOpen(false)}
+        />
+      )}
       <button type='button' onClick={() => navigate(-1)}>
         browser back
       </button>
@@ -145,6 +152,7 @@ const click = async (el: Element) => {
 const openTable = () => click(screen.getAllByText('dw.fact_sales')[0])
 const tab = (name: string) => click(drawer().getByRole('tab', { name }))
 const selectedTab = () => drawer().getByRole('tab', { selected: true }).textContent
+const layersButton = () => screen.getByRole('button', { name: 'Layers' })
 const back = () => drawer().queryByRole('button', { name: /^← Back to/ })
 
 const expectQueryKept = () => {
@@ -231,12 +239,33 @@ describe('Back in the drawer', () => {
   it('stays open on an Escape meant for the Layers panel', async () => {
     renderPage()
     await openTable()
+    await click(layersButton())
     const panel = screen.getByRole('dialog', { name: 'Layers' })
     const checkbox = within(panel).getAllByRole('checkbox')[0]
     await act(async () => {
       fireEvent.keyDown(checkbox, { key: 'Escape' })
     })
     expect(search().get('tableLevelNode')).toBe(TABLE_ID)
+  })
+
+  it('leaves an Escape to the open Layers panel while focus is still on its toolbar button', async () => {
+    renderPage()
+    await openTable()
+    // the Layers button toggles the panel without moving focus into it
+    await click(layersButton())
+    layersButton().focus()
+    expect(document.activeElement).toBe(layersButton())
+    await act(async () => {
+      fireEvent.keyDown(layersButton(), { key: 'Escape' })
+    })
+    expect(screen.queryByRole('dialog', { name: 'Layers' })).toBeNull()
+    expect(search().get('tableLevelNode')).toBe(TABLE_ID)
+    // with the panel closed, the next Escape is the drawer's
+    await act(async () => {
+      fireEvent.keyDown(layersButton(), { key: 'Escape' })
+    })
+    expect(search().get('tableLevelNode')).toBeNull()
+    expectQueryKept()
   })
 
   it('also takes a card click in the graph as a step to go back from', async () => {
