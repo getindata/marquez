@@ -11,8 +11,7 @@ import { Provider } from 'react-redux'
 import { TableLineageDatasetNode } from '../../routes/table-level/TableLineageDatasetNode'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { createStore } from 'redux'
-import { useCloseDrawer } from '../../routes/table-level/useCloseDrawer'
-import TableLevelDrawer from '../../routes/table-level/TableLevelDrawer'
+import { GraphDrawer } from '../../routes/table-level/GraphDrawer'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
 
 jest.mock('../../store/requests/jobs', () => ({
@@ -37,7 +36,6 @@ const graph = () => {
 }
 
 const Page = () => {
-  const onClose = useCloseDrawer()
   const location = useLocation()
   const navigate = useNavigate()
   const lineage = graph()
@@ -79,9 +77,8 @@ const Page = () => {
       <button type='button' onClick={() => navigate(-1)}>
         browser back
       </button>
-      <div data-testid='drawer'>
-        <TableLevelDrawer catalog={catalog} onClose={onClose} />
-      </div>
+      {/* the view's real MUI drawer, as TableLevel renders it */}
+      <GraphDrawer catalog={catalog} />
       <output data-testid='search'>{location.search}</output>
     </>
   )
@@ -101,7 +98,8 @@ const renderPage = () => {
 }
 
 const search = () => new URLSearchParams(screen.getByTestId('search').textContent as string)
-const drawer = () => within(screen.getByTestId('drawer'))
+/** The open drawer's paper; MUI renders it in a portal for a modal drawer, in place otherwise. */
+const drawer = () => within(document.querySelector('.MuiDrawer-paper') as HTMLElement)
 const click = async (el: Element) => {
   await act(async () => {
     fireEvent.click(el)
@@ -167,6 +165,29 @@ describe('Back in the drawer', () => {
     expect(search().get('tableLevelNode')).toBe(TABLE_ID)
     expect(selectedTab()).toBe('Lineage')
     expect(back()).toBeNull()
+    expectQueryKept()
+  })
+
+  it('leaves the graph usable while open: no backdrop over it, nothing hidden from it', async () => {
+    renderPage()
+    await openTable()
+    expect(drawer().getByTestId('table-drawer')).toBeTruthy()
+    // a modal drawer's backdrop covers the graph, so a pointer click on a card closes the
+    // drawer instead of reaching the card (Playwright: "MuiBackdrop-root … intercepts pointer
+    // events"); a modal also marks the rest of the page aria-hidden
+    expect(document.querySelector('.MuiBackdrop-root')).toBeNull()
+    expect(document.querySelector('.MuiModal-root')).toBeNull()
+    expect(screen.getByTestId('job-card').closest('[aria-hidden="true"]')).toBeNull()
+  })
+
+  it('closes on Escape, keeping the query', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+    })
+    expect(search().get('tableLevelNode')).toBeNull()
     expectQueryKept()
   })
 
