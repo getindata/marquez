@@ -32,6 +32,7 @@ import { datasetDescription, piiColumns, piiLabel } from './columnFacts'
 import { datasetFields } from './layout'
 import { mix } from '../../layers'
 import { selectedRing, useAxisTokens } from '../../theme'
+import { useDrawerLinkState } from './drawer/drawerHistory'
 
 import * as Redux from 'redux'
 import { bindActionCreators } from 'redux'
@@ -77,6 +78,7 @@ export const TableLineageDatasetNode = ({
   const navigate = useNavigate()
   const { nodeType, name, namespace } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const linkState = useDrawerLinkState()
   const lineageDataset = node.data.dataset
   const { marks, showFields } = node.data
   // the node type counts too: Axis names a table's own job after the table
@@ -101,7 +103,8 @@ export const TableLineageDatasetNode = ({
 
   const handleClick = () => {
     navigate(
-      nodeUrl('dataset', lineageDataset.namespace, lineageDataset.name, node.id, searchParams)
+      nodeUrl('dataset', lineageDataset.namespace, lineageDataset.name, node.id, searchParams),
+      { state: linkState(node.id) }
     )
   }
 

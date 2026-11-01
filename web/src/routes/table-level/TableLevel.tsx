@@ -27,6 +27,7 @@ import { connect } from 'react-redux'
 import { fetchLineage } from '../../store/actionCreators'
 import { useAxisTokens } from '../../theme'
 import { useCallbackRef } from '../../helpers/hooks'
+import { useCloseDrawer } from './useCloseDrawer'
 import { useLineageFetch } from './useLineageFetch'
 import { useParams, useSearchParams } from 'react-router-dom'
 import ParentSize from '@visx/responsive/lib/components/ParentSize'
@@ -100,10 +101,7 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
     [catalog, layersParam]
   )
   const closeLayers = useCallback(() => setLayersOpen(false), [])
-  const closeDrawer = () => {
-    searchParams.delete('tableLevelNode')
-    setSearchParams(searchParams)
-  }
+  const closeDrawer = useCloseDrawer()
 
   // one hop more than shown, cut on the collapsed graph; Full graph asks for at least
   // FULL_GRAPH_DEPTH hops, more if Depth asks for more

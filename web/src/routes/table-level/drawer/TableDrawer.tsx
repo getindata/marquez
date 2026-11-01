@@ -17,9 +17,9 @@ import {
   splitEffect,
 } from './axisFacets'
 import { AxisTokens, useAxisTokens } from '../../../theme'
-import { CloseButton, DrawerTabs } from './DrawerParts'
+import { BackButton, CloseButton, DrawerTabs, useDrawerTab } from './DrawerParts'
 import { CopyButton } from './CopyButton'
-import { DdlCode } from './DdlCode'
+import { DdlCode, SideBySide } from './DdlCode'
 import { FillChip, MeterRow, PiiShield, StatusDot, TagChip, tailFit } from '../cardParts'
 import { LayerCatalog, NodeMarks } from '../../../layers'
 import { LineageDataset, LineageJob, LineageNode } from '../../../types/lineage'
@@ -322,23 +322,10 @@ const DdlTab = ({
           {shown === 'source' && source && <DdlCode text={source.text} dialect={source.dialect} />}
           {shown === 'target' && <DdlCode text={target} dialect={targetDialect} />}
           {shown === 'side' && source && (
-            <div
-              data-testid='side-by-side'
-              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}
-            >
-              {[
-                { label: sourceLabel, text: source.text, dialect: source.dialect },
-                { label: targetLabel, text: target, dialect: targetDialect },
-              ].map((pane) => (
-                <div key={pane.label} style={{ minWidth: 0 }}>
-                  <div style={{ ...sectionHead, fontSize: 12, color: t.muted }}>
-                    {pane.label}
-                    <CopyButton text={pane.text} />
-                  </div>
-                  <DdlCode text={pane.text} dialect={pane.dialect} />
-                </div>
-              ))}
-            </div>
+            <SideBySide
+              source={{ label: sourceLabel, text: source.text, dialect: source.dialect }}
+              target={{ label: targetLabel, text: target, dialect: targetDialect }}
+            />
           )}
         </section>
       )}
@@ -599,7 +586,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
   const columns = drawerColumns(sourceColumns(facets, dataset.fields), migration)
   const hasDdlTab = !!ddl || !!migration
   const tabs: Tab[] = [...(hasDdlTab ? ['ddl' as Tab] : []), 'columns', 'lineage', 'facets']
-  const [tab, setTab] = useState<Tab>(tabs[0])
+  const [tab, setTab] = useDrawerTab<Tab>(tabs)
   const [view, setView] = useState<DdlView>('source')
   const marks = allMarks(catalog, 'dataset', facets)
   const status = drawerStatus(facets, migration)
@@ -621,6 +608,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
       }}
     >
       <div style={{ borderBottom: `1px solid ${t.line}` }}>
+        <BackButton lineage={lineage} />
         <Header
           dataset={dataset}
           marks={marks}

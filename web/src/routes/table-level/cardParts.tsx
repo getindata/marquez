@@ -159,7 +159,8 @@ export const MeterRow = ({
 
 /**
  * A node's lineage URL. It keeps the current query (layers, theme, depth…) so the next graph
- * looks the same, and only points `tableLevelNode` at the node.
+ * looks the same, points `tableLevelNode` at the node and drops `drawerTab`, so the node opens
+ * on its default tab.
  */
 export const nodeUrl = (
   kind: 'job' | 'dataset',
@@ -170,6 +171,8 @@ export const nodeUrl = (
 ) => {
   const params = new URLSearchParams(searchParams)
   params.set('tableLevelNode', nodeId)
+  // the next node opens on its own default tab
+  params.delete('drawerTab')
   return `/lineage/${kind}/${encodeURIComponent(namespace)}/${encodeURIComponent(
     name
   )}?${params.toString()}`
