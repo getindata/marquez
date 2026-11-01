@@ -17,6 +17,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { SCHEMES, SchemeContext } from '../../theme'
 import { TableDrawer } from '../../routes/table-level/drawer/TableDrawer'
 import { alignDdl, lineKey } from '../../routes/table-level/drawer/alignDdl'
+import { highlightLines } from '../../routes/table-level/drawer/DdlCode'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 
 /** The owner's pair: Oracle puts `(` on its own line, BigQuery keeps it on the CREATE line. */
@@ -129,6 +130,17 @@ describe('the side-by-side aligner', () => {
     expect(rowOf(rows, 'age')?.changed).toBe(true)
     expect(rowOf(rows, 'start_dt')?.changed).toBe(false)
   })
+})
+
+describe('target types', () => {
+  it.each(['BIGNUMERIC', 'INT64', 'FLOAT64', 'BYTES', 'DATETIME', 'GEOGRAPHY'])(
+    'colours the BigQuery type %s as a type, like STRING',
+    (type) => {
+      const line = highlightLines(`  c ${type},`, 'bigquery')[0]
+      const tok = line.find((t) => t.text === type)
+      expect(tok?.types).toContain('class-name')
+    }
+  )
 })
 
 describe('the side-by-side view', () => {
