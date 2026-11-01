@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from 'react'
-import { DESIGN_CATALOG } from '../layers/fixtures'
-import { JOB_ID, JOB_NAME, LATEST, SOURCE, jobGraph, run } from './jobDrawer.fixtures'
+import { CODE_FACETS, JOB_ID, JOB_NAME, LATEST, SOURCE, jobGraph, run } from './jobDrawer.fixtures'
+import { DESIGN_CATALOG, FULL_CATALOG, axisLayers } from '../layers/fixtures'
 import { JobDrawer } from '../../routes/table-level/drawer/JobDrawer'
 import { LayerCatalog, parseLayerCatalog } from '../../layers'
 import { MemoryRouter } from 'react-router-dom'
@@ -32,7 +32,11 @@ const GRAPH_URL = `/lineage/job/oracle/${JOB_NAME}?theme=xebia&layers=wave&depth
   JOB_ID
 )}`
 
-const renderDrawer = (scheme: SchemeName = 'dark', facets?: object) => {
+const renderDrawer = (
+  scheme: SchemeName = 'dark',
+  facets?: object,
+  layers: LayerCatalog = catalog
+) => {
   const { node, lineage } = jobGraph(facets)
   const onClose = jest.fn()
   const utils = render(
@@ -40,7 +44,7 @@ const renderDrawer = (scheme: SchemeName = 'dark', facets?: object) => {
       <SchemeContext.Provider
         value={{ scheme, tokens: SCHEMES[scheme], setScheme: () => undefined }}
       >
-        <JobDrawer node={node} lineage={lineage} catalog={catalog} onClose={onClose} />
+        <JobDrawer node={node} lineage={lineage} catalog={layers} onClose={onClose} />
       </SchemeContext.Provider>
     </MemoryRouter>
   )
@@ -69,6 +73,28 @@ describe('the job drawer header', () => {
     expect(meta).toContain('PL/SQL procedure')
     expect(meta).toContain('COMPLETED')
     expect(meta).toContain('Oct 31, 2026')
+  })
+
+  it('shows the job’s status, with its dot, after the latest run', () => {
+    const full = parseLayerCatalog(FULL_CATALOG).catalog as LayerCatalog
+    renderDrawer(
+      'dark',
+      {
+        ...CODE_FACETS,
+        ...axisLayers({ wave: 1, orchestrator: 'airflow', complexity: 0.64, status: 'reconciled' }),
+      },
+      full
+    )
+    const meta = screen.getByTestId('drawer-meta')
+    expect(within(meta).getByTestId('status-dot').style.background).toBe('rgb(34, 197, 94)')
+    expect(within(meta).getByTestId('drawer-status').textContent).toBe('reconciled')
+    expect(meta.textContent).toContain('status reconciled')
+  })
+
+  it('leaves the status out when the job has no status value', () => {
+    renderDrawer('dark', undefined, parseLayerCatalog(FULL_CATALOG).catalog as LayerCatalog)
+    expect(screen.queryByTestId('status-dot')).toBeNull()
+    expect(screen.queryByTestId('drawer-status')).toBeNull()
   })
 
   it.each(['light', 'dark', 'xebia'] as const)(
