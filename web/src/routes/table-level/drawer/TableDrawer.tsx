@@ -17,6 +17,7 @@ import {
   splitEffect,
 } from './axisFacets'
 import { AxisTokens, useAxisTokens } from '../../../theme'
+import { CopyButton } from './CopyButton'
 import { DdlCode } from './DdlCode'
 import { FillChip, MeterRow, tailFit } from '../cardParts'
 import { LayerCatalog, NodeMarks } from '../../../layers'
@@ -27,7 +28,7 @@ import { allMarks } from './marks'
 import { datasetTypeOf } from '../TableLineageDatasetNode'
 import { isOwnDatasetJob } from '../collapse'
 import MqJsonView from '../../../components/core/json-view/MqJsonView'
-import React, { CSSProperties, ReactNode, useEffect, useState } from 'react'
+import React, { CSSProperties, ReactNode, useState } from 'react'
 
 /**
  * The table drawer of design §7.4: the table's facts, its DDL highlighted (source, target, side
@@ -63,46 +64,6 @@ export const writersOf = (node: LineageNode, lineage: LineageGraph): string[] =>
     .map((e) => byId.get(e.origin))
     .filter((n): n is LineageNode => !!n && n.type === 'JOB' && !isOwnDatasetJob(n, byId))
     .map((n) => (n.data as LineageJob).name)
-}
-
-const copyText = (text: string) => {
-  try {
-    void navigator.clipboard?.writeText(text)
-  } catch {
-    // no clipboard (insecure origin): nothing to do
-  }
-}
-
-const CopyButton = ({ text, label = 'Copy' }: { text: string; label?: string }) => {
-  const t = useAxisTokens()
-  const [copied, setCopied] = useState(false)
-  useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(false), 1500)
-    return () => clearTimeout(timer)
-  }, [copied])
-  return (
-    <button
-      type='button'
-      onClick={() => {
-        copyText(text)
-        setCopied(true)
-      }}
-      style={{
-        marginLeft: 'auto',
-        border: `1px solid ${t.line}`,
-        background: 'none',
-        color: t.text,
-        borderRadius: 6,
-        padding: '3px 10px',
-        fontSize: 11.5,
-        cursor: 'pointer',
-        fontFamily: t.font,
-      }}
-    >
-      {copied ? 'Copied' : label}
-    </button>
-  )
 }
 
 const Chip = ({ bg, color, children }: { bg: string; color: string; children: ReactNode }) => (

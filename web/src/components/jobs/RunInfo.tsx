@@ -3,10 +3,10 @@
 import * as Redux from 'redux'
 import { Box } from '@mui/material'
 import { IState } from '../../store/reducers'
+import { JobCode } from '../../routes/table-level/drawer/JobCode'
 import { Run } from '../../types/api'
 import { connect } from 'react-redux'
 import { fetchJobFacets, resetFacets } from '../../store/actionCreators'
-import MqCode from '../core/code/MqCode'
 import MqJsonView from '../core/json-view/MqJsonView'
 import MqText from '../core/text/MqText'
 import React, { FunctionComponent, useEffect } from 'react'
@@ -57,13 +57,8 @@ const RunInfo: FunctionComponent<RunInfoProps> = (props) => {
 
   return (
     <Box>
-      {<MqCode code={(jobFacets?.sql as SqlFacet)?.query} language={'sql'} />}
-      {jobFacets?.sourceCode && (
-        <MqCode
-          code={(jobFacets.sourceCode as SourceCodeFacet)?.sourceCode}
-          language={(jobFacets.sourceCode as SourceCodeFacet)?.language}
-        />
-      )}
+      {/* Axis: a job's SQL and source code as the table drawer draws a DDL */}
+      {jobFacets && <JobCode facets={jobFacets} />}
       {jobFacets && (
         <Box mt={2}>
           <Box mb={1}>

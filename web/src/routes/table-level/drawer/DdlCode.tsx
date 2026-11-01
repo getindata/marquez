@@ -80,7 +80,7 @@ const STYLES = {
 
 /** The grammar for a DDL: PL/SQL for Oracle, plain SQL otherwise. */
 export const grammarFor = (dialect: string) =>
-  dialect.toLowerCase() === 'oracle' ? 'plsql' : 'sql'
+  ['oracle', 'plsql'].includes(dialect.toLowerCase()) ? 'plsql' : 'sql'
 
 export const editorPre = (t: AxisTokens): CSSProperties => ({
   margin: 0,
