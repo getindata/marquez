@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from 'react'
-import { DESIGN_CATALOG, FULL_CATALOG, axisLayers, piiTags } from '../layers/fixtures'
+import {
+  DESIGN_CATALOG,
+  FULL_CATALOG,
+  axisLayers,
+  axisPii,
+  columnLineage,
+  piiTags,
+} from '../layers/fixtures'
 import {
   LayerCatalog,
   LayerView,
@@ -17,6 +24,7 @@ import { TableLineageDatasetNode } from '../../routes/table-level/TableLineageDa
 import { SCHEMES } from '../../theme/schemes'
 import { fireEvent, render, screen } from '@testing-library/react'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
+import { clearFieldOriginCache } from '../../routes/table-level/columnOrigins'
 
 const catalog = parseLayerCatalog(DESIGN_CATALOG).catalog as LayerCatalog
 const ALL_ON: LayerView = {
@@ -274,6 +282,84 @@ describe('dataset node, PII columns', () => {
       },
     })
     expect(q(container, 'pii-marker')).toBeNull()
+  })
+})
+
+describe('dataset node, why a column is PII', () => {
+  const PII = {
+    ...piiTags({ col_1: 'passport', col_2: 'email' }),
+    ...axisPii({
+      col_1: ['passport', "Comment: carries the CRM's natural key, the passport number."],
+      col_2: ['email', 'Comment: the person’s email address.'],
+    }),
+  }
+  const LINEAGE = columnLineage({
+    'dw.fact_sales.col_1': ['stage.cls_customers.customer_id'],
+    'stage.cls_customers.customer_id': ['stage.wrk_customers.passport_number'],
+    'dw.fact_sales.col_2': [],
+  })
+  let fetchMock: jest.Mock
+
+  beforeEach(() => {
+    clearFieldOriginCache()
+    fetchMock = jest.fn(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(LINEAGE) } as Response)
+    )
+    global.fetch = fetchMock as unknown as typeof fetch
+  })
+
+  const row = (c: HTMLElement, i: number) => c.querySelectorAll('[data-testid="field-row"]')[i]
+
+  it("shows the kind, the agent's rationale and the source column on hover", async () => {
+    const { container } = renderDataset(NO_LAYERS, PII)
+    fireEvent.mouseOver(row(container, 1))
+    const tip = await screen.findByRole('tooltip')
+    expect(tip.textContent).toContain('Personal data: passport')
+    expect(screen.getByTestId('pii-rationale').textContent).toBe(
+      "Comment: carries the CRM's natural key, the passport number."
+    )
+    expect((await screen.findByTestId('pii-source')).textContent).toBe(
+      'from wrk_customers.passport_number'
+    )
+  })
+
+  it('asks for the lineage only on the first hover, once per table', async () => {
+    const { container } = renderDataset(NO_LAYERS, PII)
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.mouseOver(row(container, 1))
+    await screen.findByTestId('pii-source')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0][0])).toContain(
+      'nodeId=dataset%3Aoracle%3Adw.fact_sales&depth='
+    )
+    fireEvent.mouseOut(row(container, 1))
+    fireEvent.mouseOver(row(container, 2))
+    await screen.findByTestId('pii-rationale')
+    fireEvent.mouseOver(row(container, 1))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no source when the column is its own origin', async () => {
+    const { container } = renderDataset(NO_LAYERS, PII)
+    fireEvent.mouseOver(row(container, 2))
+    await screen.findByTestId('pii-rationale')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('pii-source')).toBeNull()
+  })
+
+  it('shows no rationale without the axisPii facet', async () => {
+    const { container } = renderDataset(NO_LAYERS, piiTags({ col_1: 'passport' }))
+    fireEvent.mouseOver(row(container, 1))
+    expect((await screen.findByRole('tooltip')).textContent).toContain('Personal data: passport')
+    expect(screen.queryByTestId('pii-rationale')).toBeNull()
+  })
+
+  it('asks for nothing when hovering a column that is not PII', async () => {
+    const { container } = renderDataset(NO_LAYERS, PII, true, { col_0: 'Key of the sale.' })
+    fireEvent.mouseOver(row(container, 0))
+    await screen.findByRole('tooltip')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 

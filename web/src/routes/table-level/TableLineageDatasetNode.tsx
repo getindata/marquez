@@ -25,10 +25,11 @@ import {
 } from './cardParts'
 import { IState } from '../../store/reducers'
 import { LineageDataset } from '../../types/lineage'
+import { PiiDetails } from './PiiDetails'
 import { PositionedNode } from '../../../libs/graph'
 import { TableLineageDatasetNodeData } from './nodes'
 import { connect } from 'react-redux'
-import { datasetDescription, piiColumns, piiLabel } from './columnFacts'
+import { datasetDescription, piiColumns, piiLabel, piiRationales } from './columnFacts'
 import { datasetFields } from './layout'
 import { mix } from '../../layers'
 import { selectedRing, useAxisTokens } from '../../theme'
@@ -162,6 +163,7 @@ export const TableLineageDatasetNode = ({
 
   const fields = datasetFields(lineageDataset)
   const pii = piiColumns(lineageDataset.facets)
+  const rationales = piiRationales(lineageDataset.facets)
   const shownFields = showFields ? fields.slice(0, MAX_FIELD_ROWS) : []
   const moreFields = showFields ? fields.length - shownFields.length : 0
   const rowLine = `1px solid ${t.rowLine}`
@@ -398,10 +400,15 @@ export const TableLineageDatasetNode = ({
                       <TooltipDescription>{field.description}</TooltipDescription>
                     )}
                     {kinds && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                        <PiiShield label={piiLabel(kinds)} size={13} />
-                        {piiLabel(kinds)}
-                      </div>
+                      <PiiDetails
+                        kinds={kinds}
+                        rationale={rationales.get(field.name.toLowerCase())}
+                        column={{
+                          namespace: lineageDataset.namespace,
+                          dataset: lineageDataset.name,
+                          field: field.name,
+                        }}
+                      />
                     )}
                   </div>
                 }

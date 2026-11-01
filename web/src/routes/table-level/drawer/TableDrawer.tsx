@@ -25,10 +25,12 @@ import { LayerCatalog, NodeMarks } from '../../../layers'
 import { LineageDataset, LineageJob, LineageNode } from '../../../types/lineage'
 import { LineageGraph } from '../../../types/api'
 import { LineageTab } from './LineageTab'
+import { PiiDetails } from '../PiiDetails'
 import { allMarks } from './marks'
-import { datasetDescription, piiColumns, piiLabel } from '../columnFacts'
+import { datasetDescription, piiColumns, piiLabel, piiRationales } from '../columnFacts'
 import { datasetTypeOf } from '../TableLineageDatasetNode'
 import { isOwnDatasetJob } from '../collapse'
+import MQTooltip from '../../../components/core/tooltip/MQTooltip'
 import MqJsonView from '../../../components/core/json-view/MqJsonView'
 import React, { CSSProperties, ReactNode, useState } from 'react'
 
@@ -338,11 +340,17 @@ export const ColumnsTab = ({
   columns,
   migration,
   pii = new Map(),
+  rationales = new Map(),
+  table,
 }: {
   columns: DrawerColumn[]
   migration: AxisMigration | null
   /** PII kinds by lower-cased column name. */
   pii?: Map<string, string[]>
+  /** Why each PII column is PII (`axisPii`), by lower-cased column name. */
+  rationales?: Map<string, string>
+  /** The table, to trace a PII column to its source on hover. */
+  table?: { namespace: string; name: string }
 }) => {
   const t = useAxisTokens()
   const mapped = columns.some((c) => c.target !== undefined)
@@ -378,18 +386,34 @@ export const ColumnsTab = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...mono }}>
                   {c.name}
                   {kinds && (
-                    <span
-                      title={piiLabel(kinds)}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    <MQTooltip
+                      placement='right'
+                      title={
+                        table ? (
+                          <PiiDetails
+                            kinds={kinds}
+                            rationale={rationales.get(c.name.toLowerCase())}
+                            column={{
+                              namespace: table.namespace,
+                              dataset: table.name,
+                              field: c.name,
+                            }}
+                          />
+                        ) : (
+                          piiLabel(kinds)
+                        )
+                      }
                     >
-                      <PiiShield label={piiLabel(kinds)} size={13} />
-                      <span
-                        data-testid='pii-chip'
-                        style={{ fontFamily: t.font, fontSize: 11, color: t.pii }}
-                      >
-                        {kinds.join(', ')}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <PiiShield label={piiLabel(kinds)} size={13} />
+                        <span
+                          data-testid='pii-chip'
+                          style={{ fontFamily: t.font, fontSize: 11, color: t.pii }}
+                        >
+                          {kinds.join(', ')}
+                        </span>
                       </span>
-                    </span>
+                    </MQTooltip>
                   )}
                 </div>
                 {c.description && (
@@ -623,7 +647,13 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
           <DdlTab source={ddl} migration={migration} view={view} onView={setView} />
         )}
         {tab === 'columns' && (
-          <ColumnsTab columns={columns} migration={migration} pii={piiColumns(facets)} />
+          <ColumnsTab
+            columns={columns}
+            migration={migration}
+            pii={piiColumns(facets)}
+            rationales={piiRationales(facets)}
+            table={dataset}
+          />
         )}
         {tab === 'lineage' && <LineageTab node={node} lineage={lineage} catalog={catalog} />}
         {tab === 'facets' && <MqJsonView data={(facets as object) ?? {}} />}

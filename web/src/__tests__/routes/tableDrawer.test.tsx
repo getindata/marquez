@@ -13,7 +13,15 @@ import {
   neighbourGraph,
   neighbourNode,
 } from './tableDrawer.fixtures'
-import { DESIGN_CATALOG, FULL_CATALOG, axisLayers, piiTags } from '../layers/fixtures'
+import {
+  DESIGN_CATALOG,
+  FULL_CATALOG,
+  axisLayers,
+  axisPii,
+  columnLineage,
+  piiTags,
+} from '../layers/fixtures'
+import { clearFieldOriginCache } from '../../routes/table-level/columnOrigins'
 import { EDITOR_COLORS } from '../../routes/table-level/drawer/DdlCode'
 import { LayerCatalog, parseLayerCatalog } from '../../layers'
 import { LineageGraph } from '../../types/api'
@@ -520,6 +528,31 @@ describe('descriptions, PII and the LAY-10 layers in the drawer', () => {
     expect(within(rows[1]).getByTestId('pii-marker').getAttribute('aria-label')).toBe(
       'Personal data: email'
     )
+  })
+
+  it("shows the kind, the agent's rationale and the source column when hovering the PII mark", async () => {
+    clearFieldOriginCache()
+    const fetchMock = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            columnLineage({ 'dw.fact_sales.email': ['crm.contacts.mail', 'web.users.email'] })
+          ),
+      } as Response)
+    )
+    global.fetch = fetchMock as unknown as typeof fetch
+    renderDrawer({ ...DESCRIBED, ...axisPii({ email: ['email', 'Comment: the email address.'] }) })
+    expect(fetchMock).not.toHaveBeenCalled()
+    const row = screen.getAllByTestId('column-row')[1]
+    fireEvent.mouseOver(within(row).getByTestId('pii-chip'))
+    const tip = await screen.findByRole('tooltip')
+    expect(tip.textContent).toContain('Personal data: email')
+    expect(within(tip).getByTestId('pii-rationale').textContent).toBe('Comment: the email address.')
+    expect((await within(tip).findByTestId('pii-source')).textContent).toBe(
+      'from contacts.mail, users.email'
+    )
+    expect(String(fetchMock.mock.calls[0][0])).toContain('nodeId=dataset%3Aoracle%3Adw.fact_sales')
   })
 
   it('keeps the descriptions when the migration maps the columns', () => {

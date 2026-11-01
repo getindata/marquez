@@ -134,3 +134,49 @@ export const piiTags = (columns: Record<string, string>) => ({
     })),
   },
 })
+
+/** LAY-10's `axisPii` dataset facet: each PII column with its kind and the agent's rationale. */
+export const axisPii = (columns: Record<string, [kind: string, rationale: string]>) => ({
+  axisPii: {
+    _producer: 'https://github.com/getindata/axis',
+    _schemaURL:
+      'https://raw.githubusercontent.com/getindata/axis/main/spec/facets/AxisPiiFacet.json',
+    columns: Object.entries(columns).map(([column, [kind, rationale]]) => ({
+      column,
+      kind,
+      rationale,
+      decidedBy: 'agent',
+    })),
+  },
+})
+
+/**
+ * The fork's `GET /column-lineage?nodeId=dataset:…&withDownstream=false` body, from edges
+ * `"ds.field" <- ["ds.field", …]`, all in namespace `oracle`. As the fork sends it, a node's
+ * `inEdges` run from the node (`origin`) to each field it reads (`destination`).
+ */
+export const columnLineage = (edges: Record<string, string[]>) => {
+  const id = (ref: string) => {
+    const dot = ref.lastIndexOf('.')
+    return { dataset: ref.slice(0, dot), field: ref.slice(dot + 1) }
+  }
+  const nodeId = (ref: string) => `datasetField:oracle:${id(ref).dataset}:${id(ref).field}`
+  const refs = new Set([...Object.keys(edges), ...Object.values(edges).flat()])
+  return {
+    graph: [...refs].map((ref) => ({
+      id: nodeId(ref),
+      type: 'DATASET_FIELD',
+      data: {
+        namespace: 'oracle',
+        ...id(ref),
+        fieldType: 'VARCHAR2',
+        inputFields: (edges[ref] ?? []).map((input) => ({ namespace: 'oracle', ...id(input) })),
+      },
+      inEdges: (edges[ref] ?? []).map((input) => ({
+        origin: nodeId(ref),
+        destination: nodeId(input),
+      })),
+      outEdges: [],
+    })),
+  }
+}
