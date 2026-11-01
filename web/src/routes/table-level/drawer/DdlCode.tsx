@@ -4,6 +4,7 @@
 import { AlignedRow, alignDdl, ddlLines } from './alignDdl'
 import { AxisTokens, useAxisTokens } from '../../../theme'
 import { CopyButton } from './CopyButton'
+import { stripSeparators } from './separators'
 import PrismLight from 'react-syntax-highlighter/dist/cjs/prism-light'
 import React, { CSSProperties, ReactNode } from 'react'
 import plsql from 'react-syntax-highlighter/dist/cjs/languages/prism/plsql'
@@ -147,7 +148,7 @@ const LargeDdl = ({ text }: { text: string }) => {
 export const DdlCode = ({ text, dialect }: { text: string; dialect: string }) => {
   const t = useAxisTokens()
   if (text.length > LARGE_DDL_CHARS || lineCount(text) > LARGE_DDL_LINES) {
-    return <LargeDdl text={text} />
+    return <LargeDdl text={stripSeparators(text).text} />
   }
   return (
     <PrismLight
@@ -158,7 +159,7 @@ export const DdlCode = ({ text, dialect }: { text: string; dialect: string }) =>
       data-testid='ddl-code'
       data-editor={t.editor}
     >
-      {text.replace(/\s+$/, '')}
+      {stripSeparators(text).text}
     </PrismLight>
   )
 }
@@ -224,8 +225,9 @@ const PaneHead = ({ pane }: { pane: SidePane }) => {
  * Side by side: one grid whose rows pair each source line with the target line it corresponds
  * to (see `alignDdl`), a blank cell opposite a line with no counterpart, line numbers in a muted
  * gutter, and a faint tint on a column whose type changed. A wrapped long line keeps both sides
- * level, and one scroll moves both. Over the large-DDL limits, or too large to align, it shows
- * the two panes as before.
+ * level, and one scroll moves both. Lines that are only dashes are left out before the
+ * alignment; the gutters keep the original line numbers. Over the large-DDL limits, or too
+ * large to align, it shows the two panes as before.
  */
 export const SideBySide = ({ source, target }: { source: SidePane; target: SidePane }) => {
   const t = useAxisTokens()
@@ -235,8 +237,12 @@ export const SideBySide = ({ source, target }: { source: SidePane; target: SideP
       <PaneHead pane={target} />
     </div>
   )
+  // separator lines go before the alignment, so they never take a row; Copy keeps the original
+  const shown = { source: stripSeparators(source.text), target: stripSeparators(target.text) }
   const rows: AlignedRow[] | null =
-    isLarge(source.text) || isLarge(target.text) ? null : alignDdl(source.text, target.text)
+    isLarge(source.text) || isLarge(target.text)
+      ? null
+      : alignDdl(shown.source.text, shown.target.text)
   if (!rows) {
     return (
       <div data-testid='side-by-side' data-aligned='false'>
@@ -254,8 +260,8 @@ export const SideBySide = ({ source, target }: { source: SidePane; target: SideP
   const c = EDITOR_COLORS[t.editor]
   const style = STYLES[t.editor] as Record<string, CSSProperties>
   const lines = {
-    source: highlightLines(source.text, source.dialect),
-    target: highlightLines(target.text, target.dialect),
+    source: highlightLines(shown.source.text, source.dialect),
+    target: highlightLines(shown.target.text, target.dialect),
   }
   const gutter = (n: number | undefined, first: boolean): ReactNode => (
     <div
@@ -320,9 +326,9 @@ export const SideBySide = ({ source, target }: { source: SidePane; target: SideP
             data-changed={row.changed ? 'true' : undefined}
             style={{ display: 'contents' }}
           >
-            {gutter(row.source?.n, true)}
+            {gutter(row.source && shown.source.numbers[row.source.n - 1], true)}
             {cell('source', row)}
-            {gutter(row.target?.n, false)}
+            {gutter(row.target && shown.target.numbers[row.target.n - 1], false)}
             {cell('target', row)}
           </div>
         ))}
