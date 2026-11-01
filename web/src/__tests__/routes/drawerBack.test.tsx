@@ -212,6 +212,21 @@ describe('Back in the drawer', () => {
     expect(back()).toBeNull()
   })
 
+  it('drops drawerTab when a drawer open on a tab is closed, so the next node opens on its default', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    // closed straight from the tab, not after a link (a link already drops drawerTab)
+    expect(search().get('drawerTab')).toBe('lineage')
+    await click(drawer().getByRole('button', { name: 'Close' }))
+    expect(search().get('tableLevelNode')).toBeNull()
+    expect(search().get('drawerTab')).toBeNull()
+    expectQueryKept()
+    await openTable()
+    expect(selectedTab()).toBe(drawer().getAllByRole('tab')[0].textContent)
+    expect(selectedTab()).not.toBe('Lineage')
+  })
+
   it('forgets the history when the drawer is closed', async () => {
     renderPage()
     await openTable()
