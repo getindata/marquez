@@ -35,7 +35,7 @@ import { datasetFacetsQualityAssertions, datasetFacetsStatus } from '../../helpe
 import { fetchDataset, resetDataset } from '../../store/actionCreators'
 import { formatUpdatedAt } from '../../helpers'
 import { truncateTextFront } from '../../helpers/text'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IconButton from '@mui/material/IconButton'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
 import MqStatus from '../../components/core/status/MqStatus'
@@ -73,6 +73,7 @@ export const TableLineageDatasetNode = ({
   const navigate = useNavigate()
   const { nodeType, name, namespace } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const linkState = useDrawerLinkState()
   const lineageDataset = node.data.dataset
   const { marks, showFields } = node.data
@@ -110,7 +111,8 @@ export const TableLineageDatasetNode = ({
       ? collapsed.filter((id) => id !== node.id)
       : [...collapsed, node.id]
     searchParams.set('collapsedNodes', next.toString())
-    setSearchParams(searchParams)
+    // keep the history state, so the drawer's Back survives it
+    setSearchParams(searchParams, { state: location.state })
   }
 
   const tooltip = (

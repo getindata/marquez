@@ -28,7 +28,7 @@ import { fetchLineage } from '../../store/actionCreators'
 import { useAxisTokens } from '../../theme'
 import { useCallbackRef } from '../../helpers/hooks'
 import { useLineageFetch } from './useLineageFetch'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 import ParentSize from '@visx/responsive/lib/components/ParentSize'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 
@@ -70,6 +70,7 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
   const t = useAxisTokens()
   const { nodeType, namespace, name } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
 
   const [depth, setDepth] = useState(Number(searchParams.get('depth')) || 2)
 
@@ -145,7 +146,10 @@ const ColumnLevel: React.FC<ColumnLevelProps> = ({
 
   const handleToggleLayer = (id: string) => {
     if (!catalog) return
-    setSearchParams(withActiveLayers(searchParams, toggleLayer(layerView.active, id), catalog))
+    // keep the history state, so the drawer's Back survives a layer toggle
+    setSearchParams(withActiveLayers(searchParams, toggleLayer(layerView.active, id), catalog), {
+      state: location.state,
+    })
   }
 
   return (

@@ -11,7 +11,9 @@ import { Provider } from 'react-redux'
 import { TableLineageDatasetNode } from '../../routes/table-level/TableLineageDatasetNode'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { createStore } from 'redux'
+import { ActionBar } from '../../routes/table-level/ActionBar'
 import { GraphDrawer } from '../../routes/table-level/GraphDrawer'
+import { SchemeProvider, useScheme } from '../../theme'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
 
 jest.mock('../../store/requests/jobs', () => ({
@@ -35,7 +37,20 @@ const graph = () => {
   return lineage
 }
 
+/** The scheme switch, as the header's SchemeSwitch calls it. */
+const SchemeButton = () => {
+  const { setScheme } = useScheme()
+  return (
+    <button type='button' onClick={() => setScheme('light')}>
+      scheme light
+    </button>
+  )
+}
+
 const Page = () => {
+  const [depth, setDepth] = React.useState(3)
+  const [isCompact, setIsCompact] = React.useState(false)
+  const [isFull, setIsFull] = React.useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const lineage = graph()
@@ -74,6 +89,18 @@ const Page = () => {
           }}
         />
       </svg>
+      {/* the view's real action bar: Depth, Full graph and Compact nodes write the query */}
+      <ActionBar
+        nodeType='DATASET'
+        fetchLineage={jest.fn() as any}
+        depth={depth}
+        setDepth={setDepth}
+        isCompact={isCompact}
+        setIsCompact={setIsCompact}
+        isFull={isFull}
+        setIsFull={setIsFull}
+      />
+      <SchemeButton />
       <button type='button' onClick={() => navigate(-1)}>
         browser back
       </button>
@@ -89,9 +116,11 @@ const renderPage = () => {
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[`/lineage/dataset/oracle/dw.fact_sales?${QUERY}`]}>
-        <Routes>
-          <Route path='/lineage/:nodeType/:namespace/:name' element={<Page />} />
-        </Routes>
+        <SchemeProvider>
+          <Routes>
+            <Route path='/lineage/:nodeType/:namespace/:name' element={<Page />} />
+          </Routes>
+        </SchemeProvider>
       </MemoryRouter>
     </Provider>
   )
@@ -225,6 +254,40 @@ describe('Back in the drawer', () => {
     await openTable()
     expect(selectedTab()).toBe(drawer().getAllByRole('tab')[0].textContent)
     expect(selectedTab()).not.toBe('Lineage')
+  })
+
+  it('keeps Back through a scheme switch, and Back keeps the new scheme', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    await click(drawer().getByTestId('lineage-job'))
+    await click(screen.getByRole('button', { name: 'scheme light' }))
+    expect(search().get('theme')).toBe('light')
+    expect(back()?.textContent).toBe('← Back to fact_sales')
+    await click(back() as Element)
+    expect(search().get('tableLevelNode')).toBe(TABLE_ID)
+    expect(selectedTab()).toBe('Lineage')
+    // Back does not restore the query the table had: the scheme stays as switched
+    expect(search().get('theme')).toBe('light')
+    expect(search().get('layers')).toBe('wave,complexity')
+  })
+
+  it('keeps Back through Depth and Compact nodes, and Back keeps them', async () => {
+    renderPage()
+    await openTable()
+    await tab('Lineage')
+    await click(drawer().getByTestId('lineage-job'))
+    await click(screen.getByRole('button', { name: 'Increase depth' }))
+    await click(screen.getByRole('checkbox', { name: 'Compact nodes' }))
+    expect(search().get('depth')).toBe('4')
+    expect(search().get('isCompact')).toBe('true')
+    expect(back()?.textContent).toBe('← Back to fact_sales')
+    await click(back() as Element)
+    expect(search().get('tableLevelNode')).toBe(TABLE_ID)
+    expect(selectedTab()).toBe('Lineage')
+    expect(search().get('depth')).toBe('4')
+    expect(search().get('isCompact')).toBe('true')
+    expect(search().get('theme')).toBe('xebia')
   })
 
   it('forgets the history when the drawer is closed', async () => {
