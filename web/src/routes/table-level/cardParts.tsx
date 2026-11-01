@@ -189,14 +189,31 @@ export const TooltipLine = ({ label, children }: { label: string; children: Reac
   )
 }
 
-/** The zone chip (`tag` slot): outlined in the zone colour, so it never reads as the wave. */
-export const TagChip = ({ tag }: { tag: NonNullable<NodeMarks['tag']> }) => {
+/**
+ * The zone chip (`tag` slot): outlined in the zone colour, so it never reads as the wave. With
+ * `maxWidth` (on the 190px card) a longer zone ends in an ellipsis; the tooltip has it whole.
+ */
+export const TagChip = ({
+  tag,
+  maxWidth,
+}: {
+  tag: NonNullable<NodeMarks['tag']>
+  maxWidth?: number
+}) => {
   const t = useAxisTokens()
   return (
     <span
       data-testid='tag-chip'
       style={{
-        flex: 'none',
+        ...(maxWidth
+          ? {
+              flex: '0 1 auto',
+              minWidth: 0,
+              maxWidth,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }
+          : { flex: 'none' }),
         fontSize: 10,
         lineHeight: '12px',
         padding: '0 5px',

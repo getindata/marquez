@@ -228,6 +228,26 @@ describe('dataset node, the LAY-10 layers', () => {
     }
   )
 
+  it('ellipsises a long zone on the 190px card, which may shrink the chips; the tooltip has it whole', async () => {
+    const zone = 'customer-master-data-landing-zone-eu-west'
+    const { container } = renderDataset(FULL_ON, {
+      ...LAY10_FACETS,
+      ...axisLayers({ wave: 1, zone, size: 1288490188, status: 'reconciled' }),
+    })
+    const chip = q(container, 'tag-chip')
+    expect(chip.textContent).toBe(zone)
+    expect(chip.style.maxWidth).toBe('64px')
+    expect(chip.style.overflow).toBe('hidden')
+    expect(chip.style.textOverflow).toBe('ellipsis')
+    expect(chip.style.minWidth).toBe('0')
+    expect((chip.parentElement as HTMLElement).style.minWidth).toBe('0')
+    expect((chip.parentElement as HTMLElement).style.flexShrink).toBe('1')
+    expect(q(container, 'wave-chip').style.flexShrink).toBe('0')
+    // the namespace gives way first
+    expect(q(container, 'dataset-sub').style.flexBasis).toBe('0px')
+    expect(await hoverTooltip(q(container, 'dataset-name'))).toContain(`Data zone: ${zone}`)
+  })
+
   it('gives the size label its own row, named, when complexity is off', () => {
     const active = new Set(['size'])
     const { container } = renderDataset({ catalog: full, active }, LAY10_FACETS)

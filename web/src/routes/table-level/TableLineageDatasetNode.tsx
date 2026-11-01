@@ -69,6 +69,9 @@ export const datasetTypeOf = (dataset: LineageDataset) => {
   return dataset.type === 'STREAM' ? 'stream' : 'table'
 }
 
+/** The widest the zone chip may be on the card: room for the wave chip and the namespace. */
+const TAG_MAX_WIDTH = 64
+
 export const TableLineageDatasetNode = ({
   node,
   isMiniMap,
@@ -276,12 +279,21 @@ export const TableLineageDatasetNode = ({
                 }}
               >
                 {marks.status && <StatusDot status={marks.status} />}
-                <span style={ellipsis}>
+                {/* the namespace takes what the chips leave: they keep their width first */}
+                <span data-testid='dataset-sub' style={{ ...ellipsis, flex: '1 1 0', minWidth: 0 }}>
                   {lineageDataset.namespace} · {datasetTypeOf(lineageDataset)}
                 </span>
                 {(marks.tag || wave) && (
-                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, flex: 'none' }}>
-                    {marks.tag && <TagChip tag={marks.tag} />}
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      display: 'flex',
+                      gap: 4,
+                      flex: '0 1 auto',
+                      minWidth: 0,
+                    }}
+                  >
+                    {marks.tag && <TagChip tag={marks.tag} maxWidth={TAG_MAX_WIDTH} />}
                     {wave && <FillChip fill={wave} />}
                   </span>
                 )}
