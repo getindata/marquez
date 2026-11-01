@@ -27,6 +27,7 @@ import { connect } from 'react-redux'
 import { datasetFields } from './layout'
 import { mix } from '../../layers'
 import { selectedRing, useAxisTokens } from '../../theme'
+import { useDrawerLinkState } from './drawer/drawerHistory'
 
 import * as Redux from 'redux'
 import { bindActionCreators } from 'redux'
@@ -34,7 +35,7 @@ import { datasetFacetsQualityAssertions, datasetFacetsStatus } from '../../helpe
 import { fetchDataset, resetDataset } from '../../store/actionCreators'
 import { formatUpdatedAt } from '../../helpers'
 import { truncateTextFront } from '../../helpers/text'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import IconButton from '@mui/material/IconButton'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
 import MqStatus from '../../components/core/status/MqStatus'
@@ -72,6 +73,8 @@ export const TableLineageDatasetNode = ({
   const navigate = useNavigate()
   const { nodeType, name, namespace } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const linkState = useDrawerLinkState()
   const lineageDataset = node.data.dataset
   const { marks, showFields } = node.data
   // the node type counts too: Axis names a table's own job after the table
@@ -96,7 +99,8 @@ export const TableLineageDatasetNode = ({
 
   const handleClick = () => {
     navigate(
-      nodeUrl('dataset', lineageDataset.namespace, lineageDataset.name, node.id, searchParams)
+      nodeUrl('dataset', lineageDataset.namespace, lineageDataset.name, node.id, searchParams),
+      { state: linkState(node.id) }
     )
   }
 
@@ -107,7 +111,8 @@ export const TableLineageDatasetNode = ({
       ? collapsed.filter((id) => id !== node.id)
       : [...collapsed, node.id]
     searchParams.set('collapsedNodes', next.toString())
-    setSearchParams(searchParams)
+    // keep the history state, so the drawer's Back survives it
+    setSearchParams(searchParams, { state: location.state })
   }
 
   const tooltip = (

@@ -4,7 +4,7 @@ import { FormControlLabel, Switch } from '@mui/material'
 import { HEADER_HEIGHT } from '../../helpers/theme'
 import { fetchLineage } from '../../store/actionCreators'
 import { truncateText } from '../../helpers/text'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
@@ -73,12 +73,14 @@ export const ActionBar = ({
   const { namespace, name } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  // a query write keeps the history state, so the drawer's Back survives it
+  const { state } = useLocation()
 
   const changeDepth = (next: number) => {
     const value = Math.max(0, next)
     setDepth(value)
     searchParams.set('depth', String(value))
-    setSearchParams(searchParams)
+    setSearchParams(searchParams, { state })
   }
 
   const switchLabel = (text: string) => (
@@ -206,7 +208,7 @@ export const ActionBar = ({
             onChange={(_, checked) => {
               setIsFull(checked)
               searchParams.set('isFull', checked.toString())
-              setSearchParams(searchParams)
+              setSearchParams(searchParams, { state })
             }}
           />
         }
@@ -221,7 +223,7 @@ export const ActionBar = ({
             onChange={(_, checked) => {
               setIsCompact(checked)
               searchParams.set('isCompact', checked.toString())
-              setSearchParams(searchParams)
+              setSearchParams(searchParams, { state })
             }}
           />
         }

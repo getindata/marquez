@@ -20,7 +20,7 @@ export interface NodeMarks {
   /** `fill`: the wave chip, the left accent, the tint and the border. */
   fill?: { layerId: string; color: string; chip: string; tooltip: string }
   /** `dot`: the 12px heat dot in a dataset header. */
-  dot?: { layerId: string; color: string; tooltip: string }
+  dot?: { layerId: string; color: string; label: string; tooltip: string }
   /** `meter`: the row with a 44px bar and the number. */
   meter?: { layerId: string; label: string; color: string; fraction: number; text: string }
   /** `badge`: the white disc on a job tile's corner; `icon` is absent for an unknown value. */
@@ -62,7 +62,12 @@ const resolve = (layer: LayerDefinition, v: LayerValue, marks: NodeMarks) => {
       if (layer.slot === 'dot') {
         const amount = layer.unit ? `${text} ${layer.unit}` : `${layer.title}: ${text}`
         const span = layer.window ? ` in ${layer.window}` : ''
-        marks.dot = { layerId: layer.id, color, tooltip: withDetail(amount + span, v) }
+        marks.dot = {
+          layerId: layer.id,
+          color,
+          label: amount + span,
+          tooltip: withDetail(amount + span, v),
+        }
       } else {
         marks.meter = {
           layerId: layer.id,

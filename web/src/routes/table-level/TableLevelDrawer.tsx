@@ -1,45 +1,59 @@
 import * as Redux from 'redux'
-import { Box } from '@mui/system'
 import { IState } from '../../store/reducers'
-import { LineageDataset, LineageJob } from '../../types/lineage'
+import { JobDrawer } from './drawer/JobDrawer'
+import { LayerCatalog } from '../../layers'
 import { LineageGraph } from '../../types/api'
+import { TableDrawer } from './drawer/TableDrawer'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 import { useSearchParams } from 'react-router-dom'
-import DatasetDetailPage from '../../components/datasets/DatasetDetailPage'
-import JobDetailPage from '../../components/jobs/JobDetailPage'
 import React from 'react'
 
-const WIDTH = 800
-
+interface OwnProps {
+  /** The namespace's layer catalog, for the table drawer's heat, wave and complexity. */
+  catalog: LayerCatalog | null
+  onClose: () => void
+}
 interface StateProps {
   lineageGraph: LineageGraph
 }
 interface DispatchProps {}
-const TableLevelDrawer = ({ lineageGraph }: StateProps & DispatchProps) => {
+
+/** A dataset opens the Axis table drawer (design §7.4), a job the Axis job drawer. */
+const TableLevelDrawer = ({
+  lineageGraph,
+  catalog,
+  onClose,
+}: OwnProps & StateProps & DispatchProps) => {
   const [searchParams] = useSearchParams()
 
   const node = lineageGraph.graph.find(
     (node) => node.id === searchParams.get('tableLevelNode') || ''
   )
 
-  let dataset = null
-  let job = null
   if (node?.type === 'DATASET') {
-    dataset = node.data as LineageDataset
-  } else if (node?.type === 'JOB') {
-    job = node.data as LineageJob
+    return (
+      <TableDrawer
+        key={node.id}
+        node={node}
+        lineage={lineageGraph}
+        catalog={catalog}
+        onClose={onClose}
+      />
+    )
   }
-
-  return (
-    <Box width={`${WIDTH}px`}>
-      {dataset ? (
-        <DatasetDetailPage lineageDataset={dataset} />
-      ) : (
-        <>{job && <JobDetailPage lineageJob={job} />}</>
-      )}
-    </Box>
-  )
+  if (node?.type === 'JOB') {
+    return (
+      <JobDrawer
+        key={node.id}
+        node={node}
+        lineage={lineageGraph}
+        catalog={catalog}
+        onClose={onClose}
+      />
+    )
+  }
+  return null
 }
 
 const mapStateToProps = (state: IState) => ({

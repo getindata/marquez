@@ -18,6 +18,7 @@ import { runStateColor } from '../../helpers/nodes'
 import { selectedRing, useAxisTokens } from '../../theme'
 import { theme } from '../../helpers/theme'
 import { truncateTextFront } from '../../helpers/text'
+import { useDrawerLinkState } from './drawer/drawerHistory'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import MQTooltip from '../../components/core/tooltip/MQTooltip'
 import MqStatus from '../../components/core/status/MqStatus'
@@ -33,6 +34,7 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
   const navigate = useNavigate()
   const { nodeType, name, namespace } = useParams()
   const [searchParams] = useSearchParams()
+  const linkState = useDrawerLinkState()
   const { job, jobType, marks } = node.data
   // the node type counts too: Axis names a table's own job after the table
   const isSelected =
@@ -52,7 +54,9 @@ const TableLineageJobNode = ({ node, isMiniMap }: TableLineageJobNodeProps) => {
   }
 
   const handleClick = () => {
-    navigate(nodeUrl('job', job.namespace, job.name, node.id, searchParams))
+    navigate(nodeUrl('job', job.namespace, job.name, node.id, searchParams), {
+      state: linkState(node.id),
+    })
   }
 
   const latestRun = job.latestRun
