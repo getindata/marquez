@@ -58,9 +58,26 @@ const RunState = ({ state }: { state?: string }) => {
   )
 }
 
-const runTime = (r: Run) => formatUpdatedAt(r.startedAt || r.createdAt)
-const duration = (r: Run) =>
-  typeof r.durationMs === 'number' ? stopWatchDuration(r.durationMs) : '–'
+/**
+ * A run's time: its start, else its end ("ended …"). A producer that sends only completion
+ * events (the Axis Oracle one) gives no start; `createdAt` is when Marquez stored the run.
+ */
+const runTime = (r: Run) =>
+  r.startedAt
+    ? formatUpdatedAt(r.startedAt)
+    : r.endedAt
+    ? `ended ${formatUpdatedAt(r.endedAt)}`
+    : formatUpdatedAt(r.createdAt)
+
+const runInstant = (r: Run) => Date.parse(r.startedAt || r.endedAt || r.createdAt) || 0
+
+/** `durationMs`, else end minus start; a run with no start has no duration. */
+const duration = (r: Run) => {
+  if (typeof r.durationMs === 'number') return stopWatchDuration(r.durationMs)
+  const start = Date.parse(r.startedAt)
+  const end = Date.parse(r.endedAt)
+  return start && end && end >= start ? stopWatchDuration(end - start) : '–'
+}
 
 const Header = ({
   job,
@@ -206,7 +223,10 @@ const JobRuns = ({ job }: { job: LineageJob }) => {
   useEffect(() => {
     let live = true
     getRuns(job.name, job.namespace, RUNS_LIMIT, 0)
-      .then((r: { runs: Run[] }) => live && setRuns(r?.runs ?? []))
+      .then(
+        (r: { runs: Run[] }) =>
+          live && setRuns([...(r?.runs ?? [])].sort((a, b) => runInstant(b) - runInstant(a)))
+      )
       .catch(() => live && setFailed(true))
     return () => {
       live = false
@@ -225,14 +245,14 @@ const JobRuns = ({ job }: { job: LineageJob }) => {
       <thead>
         <tr style={{ color: t.muted }}>
           <th style={{ ...cell, fontWeight: 400 }}>State</th>
-          <th style={{ ...cell, fontWeight: 400 }}>Started</th>
+          <th style={{ ...cell, fontWeight: 400 }}>Time</th>
           <th style={{ ...cell, fontWeight: 400 }}>Duration</th>
           <th style={{ ...cell, fontWeight: 400 }}>Run</th>
         </tr>
       </thead>
       <tbody>
         {runs.map((r) => (
-          <tr key={r.id} data-testid='run-row'>
+          <tr key={r.id} data-testid='run-row' data-run={r.id}>
             <td style={cell}>
               <RunState state={r.state} />
             </td>

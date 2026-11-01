@@ -154,6 +154,52 @@ describe('the job drawer tabs', () => {
     expect(rows[1].textContent).toContain('1m 01s')
   })
 
+  it('sorts runs newest first and shows the end time, without a duration, for runs with no start', async () => {
+    // the Oracle producer sends only completion events: no startedAt, no durationMs
+    const ended = (id: string, endedAt: string, createdAt: string) =>
+      ({
+        ...run(id, 'COMPLETED', '', 0),
+        startedAt: null,
+        durationMs: null,
+        endedAt,
+        createdAt,
+      } as any)
+    ;(getRuns as jest.Mock).mockResolvedValue({
+      totalCount: 3,
+      runs: [
+        ended('old', '2026-10-31T16:12:52.989Z', '2026-10-31T16:12:51.652Z'),
+        ended('new', '2026-10-31T19:30:20.637Z', '2026-10-31T19:30:21.304Z'),
+        ended('oldest', '2026-10-20T20:28:22.000Z', '2026-10-31T16:12:50.302Z'),
+      ],
+    })
+    renderDrawer()
+    await act(async () => {
+      fireEvent.click(tab('Runs'))
+    })
+    const rows = screen.getAllByTestId('run-row')
+    expect(rows.map((r) => r.getAttribute('data-run'))).toEqual(['new', 'old', 'oldest'])
+    expect(rows[2].textContent).toContain('ended Oct 20, 2026')
+    expect(rows[2].textContent).toContain('–')
+  })
+
+  it('computes a duration from the start and end when the run has no durationMs', async () => {
+    ;(getRuns as jest.Mock).mockResolvedValue({
+      totalCount: 1,
+      runs: [
+        {
+          ...run('r', 'COMPLETED', '2026-10-30T08:00:00.000Z', 0),
+          durationMs: null,
+          endedAt: '2026-10-30T08:02:05.000Z',
+        },
+      ],
+    })
+    renderDrawer()
+    await act(async () => {
+      fireEvent.click(tab('Runs'))
+    })
+    expect(screen.getByTestId('run-row').textContent).toContain('2m 05s')
+  })
+
   it('shows the job facets, and the latest run’s facets under their own heading', () => {
     renderDrawer()
     fireEvent.click(tab('Facets (raw)'))
