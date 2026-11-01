@@ -176,8 +176,16 @@ describe('the table drawer with full facets (converted)', () => {
     fireEvent.click(tab('Databricks target'))
     expect(ddlText()).toEqual([TARGET_DDL])
     fireEvent.click(tab('Side by side'))
-    expect(screen.getByTestId('side-by-side')).toBeTruthy()
-    expect(ddlText()).toEqual([SOURCE_DDL, TARGET_DDL])
+    // one aligned grid: each side's non-blank cells, in order, are that side's whole DDL
+    const grid = screen.getByTestId('side-by-side')
+    const sideText = (side: string) =>
+      Array.from(grid.querySelectorAll(`[data-side="${side}"]`))
+        .filter((el) => el.textContent !== '')
+        .map((el) => el.textContent)
+        .join('\n')
+    expect(grid.getAttribute('data-aligned')).toBe('true')
+    expect(sideText('source')).toBe(SOURCE_DDL)
+    expect(sideText('target')).toBe(TARGET_DDL)
     expect(screen.getByTestId('table-drawer').style.width).toBe('1080px')
   })
 

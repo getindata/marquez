@@ -1,10 +1,13 @@
 // Copyright 2018-2023 contributors to the Marquez project
 // SPDX-License-Identifier: Apache-2.0
 
+import { AlignedRow, alignDdl, ddlLines } from './alignDdl'
 import { AxisTokens, useAxisTokens } from '../../../theme'
+import { CopyButton } from './CopyButton'
 import PrismLight from 'react-syntax-highlighter/dist/cjs/prism-light'
-import React, { CSSProperties } from 'react'
+import React, { CSSProperties, ReactNode } from 'react'
 import plsql from 'react-syntax-highlighter/dist/cjs/languages/prism/plsql'
+import refractor, { RefractorNode } from 'refractor/core'
 
 /**
  * DDL highlighted by Prism's SQL and PL/SQL grammars (only those two are bundled), in the
@@ -44,6 +47,9 @@ export const EDITOR_COLORS = {
     number: '#B5CEA8',
     comment: '#6A9955',
     variable: '#9CDCFE',
+    gutter: '#858585',
+    changed: 'rgba(86, 156, 214, 0.12)',
+    blank: 'rgba(128, 128, 128, 0.07)',
   },
   'light-plus': {
     background: '#FFFFFF',
@@ -55,6 +61,9 @@ export const EDITOR_COLORS = {
     number: '#098658',
     comment: '#008000',
     variable: '#001080',
+    gutter: '#237893',
+    changed: 'rgba(0, 0, 255, 0.06)',
+    blank: 'rgba(128, 128, 128, 0.07)',
   },
 } as const
 
@@ -151,5 +160,173 @@ export const DdlCode = ({ text, dialect }: { text: string; dialect: string }) =>
     >
       {text.replace(/\s+$/, '')}
     </PrismLight>
+  )
+}
+
+/** A highlighted run of text: its Prism token types, outermost first. */
+interface Token {
+  text: string
+  types: string[]
+}
+
+/**
+ * A text highlighted once by the same grammars as `DdlCode`, then split into lines of tokens, so
+ * Side by side can put each line in its own cell without a Prism call per cell.
+ */
+export const highlightLines = (text: string, dialect: string): Token[][] => {
+  const lines: Token[][] = [[]]
+  const walk = (nodes: RefractorNode[], types: string[]) =>
+    nodes.forEach((node) => {
+      if (node.type === 'text') {
+        node.value.split('\n').forEach((part, i) => {
+          if (i > 0) lines.push([])
+          if (part) lines[lines.length - 1].push({ text: part, types })
+        })
+      } else {
+        walk(node.children, [...types, ...(node.properties.className ?? [])])
+      }
+    })
+  walk(refractor.highlight(ddlLines(text).join('\n'), grammarFor(dialect)), [])
+  return lines
+}
+
+const tokenStyle = (style: Record<string, CSSProperties>, types: string[]) =>
+  Object.assign({}, ...types.filter((k) => k !== 'token').map((k) => style[k] ?? {}))
+
+const isLarge = (text: string) => text.length > LARGE_DDL_CHARS || lineCount(text) > LARGE_DDL_LINES
+
+export interface SidePane {
+  label: string
+  text: string
+  dialect: string
+}
+
+const PaneHead = ({ pane }: { pane: SidePane }) => {
+  const t = useAxisTokens()
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 8,
+        fontSize: 12,
+        color: t.muted,
+      }}
+    >
+      {pane.label}
+      <CopyButton text={pane.text} />
+    </div>
+  )
+}
+
+/**
+ * Side by side: one grid whose rows pair each source line with the target line it corresponds
+ * to (see `alignDdl`), a blank cell opposite a line with no counterpart, line numbers in a muted
+ * gutter, and a faint tint on a column whose type changed. A wrapped long line keeps both sides
+ * level, and one scroll moves both. Over the large-DDL limits, or too large to align, it shows
+ * the two panes as before.
+ */
+export const SideBySide = ({ source, target }: { source: SidePane; target: SidePane }) => {
+  const t = useAxisTokens()
+  const heads = (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <PaneHead pane={source} />
+      <PaneHead pane={target} />
+    </div>
+  )
+  const rows: AlignedRow[] | null =
+    isLarge(source.text) || isLarge(target.text) ? null : alignDdl(source.text, target.text)
+  if (!rows) {
+    return (
+      <div data-testid='side-by-side' data-aligned='false'>
+        {heads}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {[source, target].map((pane) => (
+            <div key={pane.label} style={{ minWidth: 0 }}>
+              <DdlCode text={pane.text} dialect={pane.dialect} />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  const c = EDITOR_COLORS[t.editor]
+  const style = STYLES[t.editor] as Record<string, CSSProperties>
+  const lines = {
+    source: highlightLines(source.text, source.dialect),
+    target: highlightLines(target.text, target.dialect),
+  }
+  const gutter = (n: number | undefined, first: boolean): ReactNode => (
+    <div
+      aria-hidden='true'
+      style={{
+        padding: '0 10px 0 12px',
+        textAlign: 'right',
+        color: c.gutter,
+        userSelect: 'none',
+        borderLeft: first ? undefined : `1px solid ${t.line}`,
+      }}
+    >
+      {n ?? ''}
+    </div>
+  )
+  const cell = (side: 'source' | 'target', row: AlignedRow): ReactNode => {
+    const line = row[side]
+    return (
+      <div
+        data-side={side}
+        style={{
+          padding: '0 12px 0 0',
+          whiteSpace: 'pre-wrap',
+          overflowWrap: 'anywhere',
+          minWidth: 0,
+          background: !line ? c.blank : row.changed ? c.changed : undefined,
+        }}
+      >
+        {line
+          ? (lines[side][line.n - 1] ?? []).map((tok, i) =>
+              tok.types.length ? (
+                <span key={i} style={tokenStyle(style, tok.types)}>
+                  {tok.text}
+                </span>
+              ) : (
+                <React.Fragment key={i}>{tok.text}</React.Fragment>
+              )
+            )
+          : ''}
+      </div>
+    )
+  }
+  return (
+    <div data-testid='side-by-side' data-aligned='true'>
+      {heads}
+      <div
+        role='table'
+        style={{
+          ...editorPre(t),
+          padding: '12px 0',
+          color: c.text,
+          display: 'grid',
+          gridTemplateColumns: 'max-content minmax(0, 1fr) max-content minmax(0, 1fr)',
+        }}
+      >
+        {rows.map((row, i) => (
+          <div
+            key={i}
+            role='row'
+            data-testid='sbs-row'
+            data-key={row.key ?? ''}
+            data-changed={row.changed ? 'true' : undefined}
+            style={{ display: 'contents' }}
+          >
+            {gutter(row.source?.n, true)}
+            {cell('source', row)}
+            {gutter(row.target?.n, false)}
+            {cell('target', row)}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
