@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AxisTokens, useAxisTokens } from '../../../theme'
-import { CloseButton, DrawerTabs } from './DrawerParts'
+import { BackButton, CloseButton, DrawerTabs, useDrawerTab } from './DrawerParts'
 import { DRAWER_WIDE } from './TableDrawer'
 import { DatasetLinks } from './LineageTab'
 import { FillChip, MeterRow, nodeUrl, tailFit } from '../cardParts'
@@ -16,6 +16,7 @@ import { formatUpdatedAt } from '../../../helpers'
 import { getRuns } from '../../../store/requests/jobs'
 import { jobDatasets } from './neighbours'
 import { stopWatchDuration } from '../../../helpers/time'
+import { useDrawerLinkState } from './drawerHistory'
 import MqJsonView from '../../../components/core/json-view/MqJsonView'
 import React, { CSSProperties, ReactNode, useEffect, useState } from 'react'
 
@@ -181,7 +182,9 @@ const Box = ({
 const JobLineage = ({ node, lineage }: { node: LineageNode; lineage: LineageGraph }) => {
   const t = useAxisTokens()
   const [searchParams] = useSearchParams()
+  const linkState = useDrawerLinkState()
   const job = node.data as LineageJob
+  const parentId = `job:${job.namespace}:${job.parentJobName}`
   const byId = new Map(lineage.graph.map((n) => [n.id, n]))
   const reads = jobDatasets(node, byId, 'inputs')
   const writes = jobDatasets(node, byId, 'outputs')
@@ -192,13 +195,8 @@ const JobLineage = ({ node, lineage }: { node: LineageNode; lineage: LineageGrap
         <Box testid='job-parent-box' title='Part of'>
           <Link
             data-testid='job-parent'
-            to={nodeUrl(
-              'job',
-              job.namespace,
-              job.parentJobName,
-              `job:${job.namespace}:${job.parentJobName}`,
-              searchParams
-            )}
+            to={nodeUrl('job', job.namespace, job.parentJobName, parentId, searchParams)}
+            state={linkState(parentId)}
             title={`${job.namespace} · ${job.parentJobName}`}
             style={{ color: t.link, fontFamily: t.mono, fontSize: 12, textDecoration: 'none' }}
           >
@@ -280,7 +278,7 @@ export const JobDrawer = ({ node, lineage, catalog, onClose }: JobDrawerProps) =
   const job = node.data as LineageJob
   const hasCode = jobCodeBlocks(job.facets).length > 0
   const tabs: Tab[] = [...(hasCode ? ['code' as Tab] : []), 'lineage', 'runs', 'facets']
-  const [tab, setTab] = useState<Tab>(tabs[0])
+  const [tab, setTab] = useDrawerTab<Tab>(tabs)
   const runFacets = job.latestRun?.facets
 
   return (
@@ -298,6 +296,7 @@ export const JobDrawer = ({ node, lineage, catalog, onClose }: JobDrawerProps) =
         fontSize: 13,
       }}
     >
+      <BackButton lineage={lineage} />
       <Header job={job} catalog={catalog} onClose={onClose} />
       <DrawerTabs tabs={tabs} labels={TAB_LABELS} value={tab} onChange={setTab} />
       <div role='tabpanel' style={{ overflow: 'auto', padding: '14px 18px 24px', flex: 1 }}>

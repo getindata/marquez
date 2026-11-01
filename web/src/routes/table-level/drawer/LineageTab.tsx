@@ -15,6 +15,7 @@ import { LineageGraph } from '../../../types/api'
 import { Link, useSearchParams } from 'react-router-dom'
 import { allMarks } from './marks'
 import { useAxisTokens } from '../../../theme'
+import { useDrawerLinkState } from './drawerHistory'
 import React, { CSSProperties, ReactNode } from 'react'
 
 /**
@@ -30,6 +31,7 @@ const DATASET_CHARS = 56
 export const DatasetLinks = ({ lead, datasets }: { lead?: ReactNode; datasets: DatasetRef[] }) => {
   const t = useAxisTokens()
   const [searchParams] = useSearchParams()
+  const linkState = useDrawerLinkState()
   if (!datasets.length && !lead) return null
   return (
     <div style={{ marginTop: 4, fontSize: 12, color: t.muted, lineHeight: 1.6 }}>
@@ -40,6 +42,7 @@ export const DatasetLinks = ({ lead, datasets }: { lead?: ReactNode; datasets: D
           <Link
             data-testid='lineage-dataset'
             to={nodeUrl('dataset', d.namespace, d.name, d.id, searchParams)}
+            state={linkState(d.id)}
             title={`${d.namespace} · ${d.name}`}
             style={linkStyle(t.link, t.mono)}
           >
@@ -91,6 +94,7 @@ const JobRow = ({
 }) => {
   const t = useAxisTokens()
   const [searchParams] = useSearchParams()
+  const linkState = useDrawerLinkState()
   const { job } = entry
   const jobType = jobTypeOf(job.facets)
   const marks = allMarks(catalog, 'job', job.facets)
@@ -115,6 +119,7 @@ const JobRow = ({
         <Link
           data-testid='lineage-job'
           to={nodeUrl('job', job.namespace, job.name, entry.id, searchParams)}
+          state={linkState(entry.id)}
           title={`${job.namespace} · ${job.name}`}
           style={{
             ...linkStyle(t.link, t.mono),

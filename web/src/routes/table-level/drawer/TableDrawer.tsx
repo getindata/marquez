@@ -17,7 +17,7 @@ import {
   splitEffect,
 } from './axisFacets'
 import { AxisTokens, useAxisTokens } from '../../../theme'
-import { CloseButton, DrawerTabs } from './DrawerParts'
+import { BackButton, CloseButton, DrawerTabs, useDrawerTab } from './DrawerParts'
 import { CopyButton } from './CopyButton'
 import { DdlCode, SideBySide } from './DdlCode'
 import { FillChip, MeterRow, tailFit } from '../cardParts'
@@ -518,7 +518,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
   const columns = drawerColumns(sourceColumns(facets, dataset.fields), migration)
   const hasDdlTab = !!ddl || !!migration
   const tabs: Tab[] = [...(hasDdlTab ? ['ddl' as Tab] : []), 'columns', 'lineage', 'facets']
-  const [tab, setTab] = useState<Tab>(tabs[0])
+  const [tab, setTab] = useDrawerTab<Tab>(tabs)
   const [view, setView] = useState<DdlView>('source')
   const marks = allMarks(catalog, 'dataset', facets)
   const status = drawerStatus(facets, migration)
@@ -540,6 +540,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
       }}
     >
       <div style={{ borderBottom: `1px solid ${t.line}` }}>
+        <BackButton lineage={lineage} />
         <Header
           dataset={dataset}
           marks={marks}
