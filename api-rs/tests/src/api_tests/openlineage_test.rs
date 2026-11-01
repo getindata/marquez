@@ -2634,3 +2634,178 @@ async fn parent_facet_on_later_event_runs_list_consistent() {
         "count and list must agree: {page}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Latest run of a job
+// ---------------------------------------------------------------------------
+
+/// A job's facets come from its latest run, ranked by `runs.transitioned_at`.
+/// A run created by a single event (a lone COMPLETE, as a catalog push sends)
+/// must get `transitioned_at` on insert, or it ranks below an older run that
+/// happened to get two events, and the job reads that older run's facets.
+#[tokio::test]
+async fn a_run_created_by_one_event_ranks_as_the_latest_run_of_its_job() {
+    let app = TestApp::new().await;
+    let ns = generators::new_namespace_name();
+    let job_name = generators::new_job_name();
+    let catalog = |layers: &[&str]| {
+        json!({
+            "catalog": {
+                "_producer": "test",
+                "_schemaURL": "test",
+                "layers": layers
+            }
+        })
+    };
+
+    // Older run: two events, so its row is updated and gets transitioned_at.
+    let old_run = Uuid::new_v4();
+    for event_time in ["2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"] {
+        let mut event = make_run_event(
+            "COMPLETE",
+            &ns,
+            &job_name,
+            &old_run.to_string(),
+            vec![],
+            vec![],
+            None,
+            Some(catalog(&["wave", "heat"])),
+        );
+        event["eventTime"] = json!(event_time);
+        post_lineage(&app, &event).await;
+    }
+
+    // Newer run of the same job version: one COMPLETE event.
+    let new_run = Uuid::new_v4();
+    let mut event = make_run_event(
+        "COMPLETE",
+        &ns,
+        &job_name,
+        &new_run.to_string(),
+        vec![],
+        vec![],
+        None,
+        Some(catalog(&["wave", "heat", "orchestrator"])),
+    );
+    event["eventTime"] = json!("2024-01-02T00:00:00Z");
+    post_lineage(&app, &event).await;
+
+    let newest = json!(["wave", "heat", "orchestrator"]);
+
+    let job = get_job(&app, &ns, &job_name).await;
+    assert_eq!(job["latestRun"]["id"], json!(new_run.to_string()), "{job}");
+    assert_eq!(job["facets"]["catalog"]["layers"], newest, "{job}");
+
+    let url = format!("{}/api/v1/namespaces/{}/jobs", app.base_url, encode(&ns));
+    let page: Value = app
+        .client
+        .get(&url)
+        .send()
+        .await
+        .expect("list jobs")
+        .json()
+        .await
+        .expect("parse jobs json");
+    let listed = &page["jobs"][0];
+    assert_eq!(
+        listed["latestRun"]["id"],
+        json!(new_run.to_string()),
+        "{page}"
+    );
+    assert_eq!(listed["facets"]["catalog"]["layers"], newest, "{page}");
+}
+
+/// V78 backfills `runs.transitioned_at` for stateful runs the old INSERT left
+/// NULL, so a job that is never emitted again still ranks its newest run first.
+/// The backfill writes `created_at`, the ingestion time that the fixed INSERT
+/// writes: an event-time source (`run_states.transitioned_at`) would rank a
+/// back-dated or replayed run below an older run ingested earlier the same day.
+#[tokio::test]
+async fn v78_backfill_ranks_a_run_stored_without_transitioned_at_as_the_latest() {
+    let app = TestApp::new().await;
+    let ns = generators::new_namespace_name();
+    let job_name = generators::new_job_name();
+    let catalog = |layers: &[&str]| {
+        json!({
+            "catalog": {
+                "_producer": "test",
+                "_schemaURL": "test",
+                "layers": layers
+            }
+        })
+    };
+    let post = |run: Uuid, event_time: &'static str, layers: &'static [&'static str]| {
+        let mut event = make_run_event(
+            "COMPLETE",
+            &ns,
+            &job_name,
+            &run.to_string(),
+            vec![],
+            vec![],
+            None,
+            Some(catalog(layers)),
+        );
+        event["eventTime"] = json!(event_time);
+        event
+    };
+
+    // Older run: two back-dated events, so its transitioned_at is set on update.
+    let old_run = Uuid::new_v4();
+    for event_time in ["2024-01-01T00:00:00Z", "2024-01-01T00:00:01Z"] {
+        post_lineage(&app, &post(old_run, event_time, &["wave", "heat"])).await;
+    }
+    // Newer run, one back-dated event, stored the old way: transitioned_at NULL.
+    let new_run = Uuid::new_v4();
+    post_lineage(
+        &app,
+        &post(
+            new_run,
+            "2024-01-02T00:00:00Z",
+            &["wave", "heat", "orchestrator"],
+        ),
+    )
+    .await;
+    sqlx::query("UPDATE runs SET transitioned_at = NULL WHERE uuid = $1")
+        .bind(new_run)
+        .execute(&app.db.pool)
+        .await
+        .expect("store the run the old way");
+
+    // Before the backfill the job reads the older run.
+    let job = get_job(&app, &ns, &job_name).await;
+    assert_eq!(job["latestRun"]["id"], json!(old_run.to_string()), "{job}");
+
+    let sql = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../migrations/V78__backfill_runs_transitioned_at.sql"),
+    )
+    .expect("read V78 migration");
+    sqlx::raw_sql(&sql)
+        .execute(&app.db.pool)
+        .await
+        .expect("apply V78");
+
+    let newest = json!(["wave", "heat", "orchestrator"]);
+
+    let job = get_job(&app, &ns, &job_name).await;
+    assert_eq!(job["latestRun"]["id"], json!(new_run.to_string()), "{job}");
+    assert_eq!(job["facets"]["catalog"]["layers"], newest, "{job}");
+
+    let url = format!("{}/api/v1/namespaces/{}/jobs", app.base_url, encode(&ns));
+    let page: Value = app
+        .client
+        .get(&url)
+        .send()
+        .await
+        .expect("list jobs")
+        .json()
+        .await
+        .expect("parse jobs json");
+    let listed = &page["jobs"][0];
+    assert_eq!(
+        listed["latestRun"]["id"],
+        json!(new_run.to_string()),
+        "{page}"
+    );
+    assert_eq!(listed["facets"]["catalog"]["layers"], newest, "{page}");
+}
