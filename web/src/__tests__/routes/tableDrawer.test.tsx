@@ -555,6 +555,51 @@ describe('descriptions, PII and the LAY-10 layers in the drawer', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('nodeId=dataset%3Aoracle%3Adw.fact_sales')
   })
 
+  describe('malformed facets and untrusted text', () => {
+    const HTML = '<img src=x onerror="alert(1)">'
+
+    it.each([
+      [{ documentation: 'x', tags: 'x', axisPii: 'x' }],
+      [{ documentation: null, tags: { tags: 'x' }, axisPii: { columns: 'x' } }],
+      [
+        {
+          documentation: { description: { html: HTML } },
+          tags: { tags: [null, 1, { key: 'pii', field: 7 }, { key: 1, field: 'sale_id' }] },
+          axisPii: { columns: [null, { column: 'sale_id', rationale: 9 }] },
+        },
+      ],
+    ])('draws the header and the Columns tab from malformed facets: %j', (bad) => {
+      renderDrawer({ ...SCHEMA, ...bad })
+      expect(screen.queryByTestId('drawer-description')).toBeNull()
+      fireEvent.click(tab('Columns'))
+      expect(screen.getAllByTestId('column-row')).toHaveLength(4)
+      expect(screen.queryByTestId('pii-chip')).toBeNull()
+    })
+
+    it('writes HTML-like descriptions, PII kinds and rationales as text', async () => {
+      clearFieldOriginCache()
+      global.fetch = jest.fn(() =>
+        Promise.resolve({ ok: false, status: 404 } as Response)
+      ) as unknown as typeof fetch
+      renderDrawer({
+        ...SCHEMA,
+        documentation: { description: HTML },
+        schema: { fields: [{ name: 'email', type: 'VARCHAR2', description: `${HTML} column` }] },
+        ...piiTags({ email: HTML }),
+        ...axisPii({ email: [HTML, `${HTML} rationale`] }),
+      })
+      expect(screen.getByTestId('drawer-description').textContent).toBe(HTML)
+      fireEvent.click(tab('Columns'))
+      const row = screen.getAllByTestId('column-row')[0]
+      expect(within(row).getByTestId('column-description').textContent).toBe(`${HTML} column`)
+      expect(within(row).getByTestId('pii-chip').textContent).toBe(HTML)
+      fireEvent.mouseOver(within(row).getByTestId('pii-chip'))
+      const tip = await screen.findByRole('tooltip')
+      expect(within(tip).getByTestId('pii-rationale').textContent).toBe(`${HTML} rationale`)
+      expect(document.querySelectorAll('img')).toHaveLength(0)
+    })
+  })
+
   it('keeps the descriptions when the migration maps the columns', () => {
     renderDrawer({ ...DESCRIBED, ...migration('applied') })
     fireEvent.click(tab('Columns'))

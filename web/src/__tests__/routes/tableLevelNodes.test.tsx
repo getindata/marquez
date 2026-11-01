@@ -22,7 +22,7 @@ import { LineageDataset, LineageJob } from '../../types/lineage'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { TableLineageDatasetNode } from '../../routes/table-level/TableLineageDatasetNode'
 import { SCHEMES } from '../../theme/schemes'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import TableLineageJobNode from '../../routes/table-level/TableLineageJobNode'
 import { clearFieldOriginCache } from '../../routes/table-level/columnOrigins'
 
@@ -360,6 +360,73 @@ describe('dataset node, why a column is PII', () => {
     fireEvent.mouseOver(row(container, 0))
     await screen.findByRole('tooltip')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('dataset node, malformed facets and untrusted text', () => {
+  const HTML = '<img src=x onerror="alert(1)">'
+  const MALFORMED: object[] = [
+    { documentation: 'x', tags: 'x', axisPii: 'x' },
+    { documentation: null, tags: null, axisPii: null },
+    { documentation: { description: 42 }, tags: { tags: 'x' }, axisPii: { columns: 'x' } },
+    {
+      documentation: { description: { html: HTML } },
+      tags: { tags: [null, 1, 'pii', { key: 1, field: 'col_1' }, { key: 'pii', field: 7 }] },
+      axisPii: { columns: [null, { column: 'col_1', rationale: 9 }, { column: 3 }] },
+    },
+    { documentation: [], tags: [], axisPii: [] },
+  ]
+  const imgs = () => document.querySelectorAll('img').length
+  let fetchMock: jest.Mock
+
+  beforeEach(() => {
+    clearFieldOriginCache()
+    fetchMock = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(columnLineage({ 'dw.fact_sales.col_1': [`stage.${HTML}.col`, 'x.y.z'] })),
+      } as Response)
+    )
+    global.fetch = fetchMock as unknown as typeof fetch
+  })
+
+  it.each(MALFORMED.map((f, i) => [i, f]))(
+    'draws the card, its tooltip and its rows from malformed facets (case %i)',
+    async (_, facets) => {
+      const { container } = renderDataset(NO_LAYERS, facets)
+      expect(container.querySelectorAll('[data-testid="field-row"]')).toHaveLength(4)
+      expect(q(container, 'pii-marker')).toBeNull()
+      await hoverTooltip(q(container, 'dataset-name'))
+      expect(screen.queryByTestId('tooltip-description')).toBeNull()
+    }
+  )
+
+  it('writes an HTML-like description in the name tooltip as text', async () => {
+    const { container } = renderDataset(NO_LAYERS, { documentation: { description: HTML } })
+    await hoverTooltip(q(container, 'dataset-name'))
+    expect(screen.getByTestId('tooltip-description').textContent).toBe(HTML)
+    expect(imgs()).toBe(0)
+  })
+
+  it('writes an HTML-like column description, PII kind, rationale and source as text', async () => {
+    const { container } = renderDataset(
+      NO_LAYERS,
+      { ...piiTags({ col_1: HTML }), ...axisPii({ col_1: [HTML, `${HTML} rationale`] }) },
+      true,
+      { col_1: `${HTML} description` }
+    )
+    const row = container.querySelectorAll('[data-testid="field-row"]')[1]
+    expect(row.querySelector('[data-testid="pii-marker"]')?.getAttribute('aria-label')).toBe(
+      `Personal data: ${HTML}`
+    )
+    fireEvent.mouseOver(row)
+    const tip = await screen.findByRole('tooltip')
+    expect(within(tip).getByTestId('tooltip-description').textContent).toBe(`${HTML} description`)
+    expect(tip.textContent).toContain(`Personal data: ${HTML}`)
+    expect(within(tip).getByTestId('pii-rationale').textContent).toBe(`${HTML} rationale`)
+    expect((await within(tip).findByTestId('pii-source')).textContent).toBe(`from ${HTML}.col, y.z`)
+    expect(imgs()).toBe(0)
   })
 })
 
