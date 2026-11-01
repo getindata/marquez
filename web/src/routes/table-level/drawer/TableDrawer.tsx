@@ -17,6 +17,7 @@ import {
   splitEffect,
 } from './axisFacets'
 import { AxisTokens, useAxisTokens } from '../../../theme'
+import { CloseButton, DrawerTabs } from './DrawerParts'
 import { CopyButton } from './CopyButton'
 import { DdlCode } from './DdlCode'
 import { FillChip, MeterRow, PiiShield, StatusDot, TagChip, tailFit } from '../cardParts'
@@ -507,20 +508,7 @@ const Header = ({
           {marks.tag && <TagChip tag={marks.tag} />}
           {marks.fill && <FillChip fill={marks.fill} />}
         </span>
-        <button
-          type='button'
-          aria-label='Close'
-          onClick={onClose}
-          style={{
-            border: 0,
-            background: 'none',
-            color: t.muted,
-            fontSize: 18,
-            cursor: 'pointer',
-          }}
-        >
-          ✕
-        </button>
+        <CloseButton onClose={onClose} />
       </div>
       {description && (
         <div
@@ -641,38 +629,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
           onClose={onClose}
         />
       </div>
-      <div
-        role='tablist'
-        style={{
-          display: 'flex',
-          gap: 4,
-          padding: '8px 14px 0',
-          borderBottom: `1px solid ${t.line}`,
-        }}
-      >
-        {tabs.map((k) => (
-          <button
-            key={k}
-            type='button'
-            role='tab'
-            aria-selected={tab === k}
-            onClick={() => setTab(k)}
-            style={{
-              border: 0,
-              background: 'none',
-              padding: '7px 12px',
-              cursor: 'pointer',
-              fontFamily: t.font,
-              fontSize: 13,
-              color: tab === k ? t.text : t.muted,
-              fontWeight: tab === k ? 600 : 400,
-              borderBottom: `2px solid ${tab === k ? t.accent : 'transparent'}`,
-            }}
-          >
-            {TAB_LABELS[k]}
-          </button>
-        ))}
-      </div>
+      <DrawerTabs tabs={tabs} labels={TAB_LABELS} value={tab} onChange={setTab} />
       <div role='tabpanel' style={{ overflow: 'auto', padding: '14px 18px 24px', flex: 1 }}>
         {tab === 'ddl' && (
           <DdlTab source={ddl} migration={migration} view={view} onView={setView} />

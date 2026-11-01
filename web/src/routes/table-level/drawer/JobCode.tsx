@@ -30,12 +30,18 @@ const obj = (v: unknown): Record<string, unknown> =>
 
 const SQL_LANGUAGES: Record<string, string> = { sql: 'sql', plsql: 'oracle', 'pl/sql': 'oracle' }
 
-/** The code blocks of a job's facets: the `sql` query, then the `sourceCode` source. */
+/**
+ * The code blocks of a job's facets: the `sql` query, then the `sourceCode` source. The query
+ * is left out when it is empty or the source code contains it (after trimming).
+ */
 export const jobCodeBlocks = (facets: unknown): JobCodeBlock[] => {
   const f = obj(facets)
   const blocks: JobCodeBlock[] = []
   const sql = obj(f.sql)
-  if (str(sql.query).trim()) {
+  const query = str(sql.query).trim()
+  // the Oracle producer sends the unit's first line as the query: a query the source code
+  // already holds adds nothing
+  if (query && !str(obj(f.sourceCode).sourceCode).includes(query)) {
     const dialect = str(sql.dialect)
     blocks.push({
       facet: 'sql',
