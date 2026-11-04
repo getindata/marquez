@@ -12,10 +12,12 @@ import {
 import { ColumnLineageGraph, Dataset } from '../../types/api'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { IState } from '../../store/reducers'
+import { JobTypeTile } from '../../layers'
 import { bindActionCreators } from 'redux'
 import { connect } from 'react-redux'
 import { faDatabase } from '@fortawesome/free-solid-svg-icons'
 import { fetchDataset } from '../../store/actionCreators'
+import { isPowerBiNamespace } from '../table-level/powerbi'
 import { useSearchParams } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
 import CloseIcon from '@mui/icons-material/Close'
@@ -70,24 +72,30 @@ const ColumnLevelDrawer = ({
         <Box px={2} pb={2} display={'flex'} justifyContent={'space-between'} alignItems={'center'}>
           <Box display={'flex'} alignItems={'center'}>
             <Box display={'flex'} alignItems={'center'}>
-              <Box
-                mr={2}
-                borderRadius={theme.spacing(1)}
-                p={1}
-                width={32}
-                height={32}
-                display={'flex'}
-                bgcolor={theme.palette.info.main}
-              >
-                <FontAwesomeIcon
-                  aria-hidden={'true'}
-                  title={'Dataset'}
-                  icon={faDatabase}
-                  width={16}
-                  height={16}
-                  color={theme.palette.common.white}
-                />
-              </Box>
+              {isPowerBiNamespace(searchParams.get('namespace')) ? (
+                <Box mr={2} width={32} height={32} display={'flex'} data-testid='powerbi-mark'>
+                  <JobTypeTile glyph='powerbi' size={32} />
+                </Box>
+              ) : (
+                <Box
+                  mr={2}
+                  borderRadius={theme.spacing(1)}
+                  p={1}
+                  width={32}
+                  height={32}
+                  display={'flex'}
+                  bgcolor={theme.palette.info.main}
+                >
+                  <FontAwesomeIcon
+                    aria-hidden={'true'}
+                    title={'Dataset'}
+                    icon={faDatabase}
+                    width={16}
+                    height={16}
+                    color={theme.palette.common.white}
+                  />
+                </Box>
+              )}
             </Box>
             <MqText heading>{searchParams.get('dataset')}</MqText>
           </Box>

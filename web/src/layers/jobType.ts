@@ -16,6 +16,7 @@ export type JobGlyph =
   | 'notebook'
   | 'sql'
   | 'airflow'
+  | 'powerbi'
   | 'gear'
 
 export interface JobTypeInfo {
@@ -66,6 +67,11 @@ export const jobTypeOf = (facets: unknown): JobTypeInfo => {
     case 'AIRFLOW':
       if (type === 'task') return info('airflow', 'Airflow task')
       if (type === 'dag') return info('airflow', 'Airflow DAG')
+      break
+    case 'POWERBI':
+      if (type === 'page') return info('powerbi', 'Power BI page')
+      if (type === 'dax') return info('powerbi', 'DAX measures')
+      if (type === 'refresh') return info('powerbi', 'Power Query refresh')
       break
     case 'AXIS':
       if (type === 'catalog') return { glyph: 'gear', caption: 'layer catalog', hidden: true }

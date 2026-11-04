@@ -4,7 +4,8 @@
 /**
  * Vendor marks and job-type glyphs of the Axis lineage UI, inlined as SVG in this one module.
  * The marks remain their owners' trademarks and are used only to identify the tool that runs
- * or defines a job. Each mark's source is noted beside it.
+ * or defines a job. Each mark's source is noted beside it. The Power BI glyph is not a vendor
+ * mark: it is drawn for Axis (see `POWERBI_BARS`).
  */
 
 import { JobGlyph } from './jobType'
@@ -181,6 +182,27 @@ export const OrchestratorBadge = ({
 
 const RED = '#f26b5b'
 
+/** Power BI's yellow. */
+export const POWERBI_YELLOW = '#F2C811'
+
+/**
+ * The Power BI glyph: drawn for Axis, three columns of a column chart in Power BI's yellow
+ * #F2C811, rising left to right, on a dark tile. It is not Microsoft's Power BI logo: we know of
+ * no CC0 source of that mark, so it is not used. Each bar is [x, top, width, opacity] in the
+ * tile's 34-unit box, standing on y 26.
+ */
+const POWERBI_BARS: [number, number, number, number][] = [
+  [8.5, 19, 4.5, 0.55],
+  [14.75, 14, 4.5, 0.78],
+  [21, 8, 4.5, 1],
+]
+
+/** A bar with rounded top corners: a path, since a `rect`'s `rx` rounds all four. */
+const topRounded = (x: number, top: number, w: number, bottom = 26, r = 1.2) =>
+  `M${x} ${bottom}V${top + r}a${r} ${r} 0 0 1 ${r} -${r}h${
+    w - 2 * r
+  }a${r} ${r} 0 0 1 ${r} ${r}V${bottom}z`
+
 /** The 34px job-type tile (design §4.4); `gear` is stock Marquez's job icon on a neutral tile. */
 export const JobTypeTile = ({
   glyph,
@@ -277,6 +299,15 @@ export const JobTypeTile = ({
             strokeWidth='1.5'
             strokeLinecap='round'
           />
+        </>
+      )
+    case 'powerbi':
+      return tile(
+        '#3a3110',
+        <>
+          {POWERBI_BARS.map(([x, top, w, opacity]) => (
+            <path key={x} d={topRounded(x, top, w)} fill={POWERBI_YELLOW} opacity={opacity} />
+          ))}
         </>
       )
     case 'sql':

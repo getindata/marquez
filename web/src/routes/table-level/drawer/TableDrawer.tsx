@@ -20,16 +20,21 @@ import { AxisTokens, useAxisTokens } from '../../../theme'
 import { BackButton, CloseButton, DrawerTabs, useDrawerTab } from './DrawerParts'
 import { CopyButton } from './CopyButton'
 import { DdlCode, SideBySide } from './DdlCode'
-import { FillChip, MeterRow, PiiShield, StatusDot, TagChip, tailFit } from '../cardParts'
-import { LayerCatalog, NodeMarks } from '../../../layers'
+import { FillChip, MeterRow, PiiShield, StatusDot, TagChip, nodeUrl, tailFit } from '../cardParts'
+import { JobCode } from './JobCode'
+import { JobTypeTile, LayerCatalog, NodeMarks } from '../../../layers'
 import { LineageDataset, LineageJob, LineageNode } from '../../../types/lineage'
 import { LineageGraph } from '../../../types/api'
 import { LineageTab } from './LineageTab'
+import { Link, useSearchParams } from 'react-router-dom'
+import { POWER_QUERY_LANGUAGES, powerBiKindOf, readPowerBiPage, writerWithCode } from '../powerbi'
+import { PageTab } from './PageTab'
 import { PiiDetails } from '../PiiDetails'
 import { allMarks } from './marks'
 import { datasetDescription, piiColumns, piiLabel, piiRationales } from '../columnFacts'
 import { datasetTypeOf } from '../TableLineageDatasetNode'
 import { isOwnDatasetJob } from '../collapse'
+import { useDrawerLinkState } from './drawerHistory'
 import MQTooltip from '../../../components/core/tooltip/MQTooltip'
 import MqJsonView from '../../../components/core/json-view/MqJsonView'
 import React, { CSSProperties, ReactNode, useState } from 'react'
@@ -39,21 +44,31 @@ import React, { CSSProperties, ReactNode, useState } from 'react'
  * by side) with the migration rules for the target, the column type mapping, the table's
  * upstream and downstream jobs (Lineage) and the raw facets. A missing `axisDdl` or
  * `axisMigration` hides its sections.
+ *
+ * A Power BI dataset opens the same drawer with the Power BI mark in its header and its own
+ * tabs: a model table has Columns, then the Power Query M of the refresh that loads it; the
+ * measures have their DAX, then Columns; a page has Page (its wireframe), then Fields.
  */
 
 export const DRAWER_WIDTH = 640
 /** Side by side needs room for two editors. */
 export const DRAWER_WIDE = 1080
 
-type Tab = 'ddl' | 'columns' | 'lineage' | 'facets'
+type Tab = 'page' | 'dax' | 'ddl' | 'columns' | 'm' | 'lineage' | 'facets'
 type DdlView = 'source' | 'target' | 'side'
 
 const TAB_LABELS: Record<Tab, string> = {
+  page: 'Page',
+  dax: 'DAX',
   ddl: 'DDL',
   columns: 'Columns',
+  m: 'Power Query M',
   lineage: 'Lineage',
   facets: 'Facets (raw)',
 }
+
+/** A page's columns are the fields its visuals use. */
+const PAGE_TAB_LABELS: Record<Tab, string> = { ...TAB_LABELS, columns: 'Fields' }
 
 const STATE_LABELS: Record<MigrationRule['state'], string> = {
   will_apply: 'will apply',
@@ -342,6 +357,7 @@ export const ColumnsTab = ({
   pii = new Map(),
   rationales = new Map(),
   table,
+  typeLabel = 'Source type',
 }: {
   columns: DrawerColumn[]
   migration: AxisMigration | null
@@ -351,6 +367,8 @@ export const ColumnsTab = ({
   rationales?: Map<string, string>
   /** The table, to trace a PII column to its source on hover. */
   table?: { namespace: string; name: string }
+  /** The type column's head: a table's types are its source's, a Power BI model's its own. */
+  typeLabel?: string
 }) => {
   const t = useAxisTokens()
   const mapped = columns.some((c) => c.target !== undefined)
@@ -372,7 +390,7 @@ export const ColumnsTab = ({
       <thead>
         <tr>
           <th style={head}>Column</th>
-          <th style={head}>Source type</th>
+          <th style={head}>{typeLabel}</th>
           {mapped && <th style={head}>{target} type</th>}
           {mapped && <th style={head}>Mapping</th>}
         </tr>
@@ -448,6 +466,40 @@ export const ColumnsTab = ({
   )
 }
 
+/**
+ * The code of the job that writes a Power BI dataset (a refresh's M, the measures' DAX), drawn
+ * as the job drawer's Code tab, under a link to that job.
+ */
+const WriterCode = ({
+  writer,
+  what,
+}: {
+  writer: { id: string; job: LineageJob }
+  what: string
+}) => {
+  const t = useAxisTokens()
+  const [searchParams] = useSearchParams()
+  const linkState = useDrawerLinkState()
+  const { job } = writer
+  return (
+    <div data-testid='writer-code'>
+      <div style={{ marginBottom: 12, fontSize: 12, color: t.muted }}>
+        {what}{' '}
+        <Link
+          data-testid='writer-job'
+          to={nodeUrl('job', job.namespace, job.name, writer.id, searchParams)}
+          state={linkState(writer.id)}
+          title={`${job.namespace} · ${job.name}`}
+          style={{ color: t.link, fontFamily: t.mono, fontSize: 12, textDecoration: 'none' }}
+        >
+          {tailFit(job.name, 60)}
+        </Link>
+      </div>
+      <JobCode facets={job.facets} />
+    </div>
+  )
+}
+
 const Header = ({
   dataset,
   marks,
@@ -462,6 +514,7 @@ const Header = ({
   onClose: () => void
 }) => {
   const t = useAxisTokens()
+  const powerBi = powerBiKindOf(dataset) !== null
   const sub = [dataset.namespace, datasetTypeOf(dataset), marks.dot?.label]
     .filter(Boolean)
     .join(' · ')
@@ -473,6 +526,11 @@ const Header = ({
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 18px 10px' }}>
+        {powerBi && (
+          <span data-testid='powerbi-mark' style={{ flex: 'none', width: 34, height: 34 }}>
+            <JobTypeTile glyph='powerbi' />
+          </span>
+        )}
         {marks.dot && (
           <span
             data-testid='heat-dot'
@@ -608,8 +666,24 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
   const ddl = readAxisDdl(facets)
   const migration = readAxisMigration(facets)
   const columns = drawerColumns(sourceColumns(facets, dataset.fields), migration)
-  const hasDdlTab = !!ddl || !!migration
-  const tabs: Tab[] = [...(hasDdlTab ? ['ddl' as Tab] : []), 'columns', 'lineage', 'facets']
+  const powerBi = powerBiKindOf(dataset)
+  const page = powerBi === 'page' ? readPowerBiPage(facets) : null
+  const writer =
+    powerBi === 'table'
+      ? writerWithCode(node, lineage, POWER_QUERY_LANGUAGES)
+      : powerBi === 'measures'
+      ? writerWithCode(node, lineage, ['dax'])
+      : null
+  const hasDdlTab = !powerBi && (!!ddl || !!migration)
+  const tabs: Tab[] = [
+    ...(page ? ['page' as Tab] : []),
+    ...(powerBi === 'measures' && writer ? ['dax' as Tab] : []),
+    ...(hasDdlTab ? ['ddl' as Tab] : []),
+    'columns',
+    ...(powerBi === 'table' && writer ? ['m' as Tab] : []),
+    'lineage',
+    'facets',
+  ]
   const [tab, setTab] = useDrawerTab<Tab>(tabs)
   const [view, setView] = useState<DdlView>('source')
   const marks = allMarks(catalog, 'dataset', facets)
@@ -641,8 +715,16 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
           onClose={onClose}
         />
       </div>
-      <DrawerTabs tabs={tabs} labels={TAB_LABELS} value={tab} onChange={setTab} />
+      <DrawerTabs
+        tabs={tabs}
+        labels={powerBi === 'page' ? PAGE_TAB_LABELS : TAB_LABELS}
+        value={tab}
+        onChange={setTab}
+      />
       <div role='tabpanel' style={{ overflow: 'auto', padding: '14px 18px 24px', flex: 1 }}>
+        {tab === 'page' && page && <PageTab page={page} fields={columns.map((c) => c.name)} />}
+        {tab === 'dax' && writer && <WriterCode writer={writer} what='Defined by' />}
+        {tab === 'm' && writer && <WriterCode writer={writer} what='Loaded by' />}
         {tab === 'ddl' && (
           <DdlTab source={ddl} migration={migration} view={view} onView={setView} />
         )}
@@ -653,6 +735,7 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
             pii={piiColumns(facets)}
             rationales={piiRationales(facets)}
             table={dataset}
+            typeLabel={powerBi ? 'Type' : undefined}
           />
         )}
         {tab === 'lineage' && <LineageTab node={node} lineage={lineage} catalog={catalog} />}

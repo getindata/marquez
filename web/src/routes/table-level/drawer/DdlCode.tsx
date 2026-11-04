@@ -7,12 +7,15 @@ import { CopyButton } from './CopyButton'
 import { stripSeparators } from './separators'
 import PrismLight from 'react-syntax-highlighter/dist/cjs/prism-light'
 import React, { CSSProperties, ReactNode } from 'react'
+import dax from 'react-syntax-highlighter/dist/cjs/languages/prism/dax'
 import plsql from 'react-syntax-highlighter/dist/cjs/languages/prism/plsql'
+import powerquery from 'react-syntax-highlighter/dist/cjs/languages/prism/powerquery'
 import refractor, { RefractorNode } from 'refractor/core'
 
 /**
- * DDL highlighted by Prism's SQL and PL/SQL grammars (only those two are bundled), in the
- * colours of VS Code's Dark+ or Light+ editor themes, as the scheme's `editor` token says.
+ * DDL and job code highlighted by Prism's SQL, PL/SQL, DAX and Power Query M grammars (only
+ * those are bundled), in the colours of VS Code's Dark+ or Light+ editor themes, as the
+ * scheme's `editor` token says.
  */
 
 /** Column types: Prism's SQL grammars leave most of them plain, editors colour them as types. */
@@ -35,6 +38,19 @@ const oracleSql = Object.assign(
   { displayName: 'plsql', aliases: [] as string[] }
 )
 PrismLight.registerLanguage('plsql', oracleSql)
+
+// DAX: a `'Table'[Column]` or `Table[Column]` and a `[Measure]` are names, coloured as variables
+// as VS Code's DAX extensions do (Prism calls them symbols and constants)
+const daxGrammar = Object.assign(
+  (Prism: any) => {
+    dax(Prism)
+    Prism.languages.dax['data-field'].alias = 'variable'
+    Prism.languages.dax.measure.alias = 'variable'
+  },
+  { displayName: 'dax', aliases: [] as string[] }
+)
+PrismLight.registerLanguage('dax', daxGrammar)
+PrismLight.registerLanguage('powerquery', powerquery)
 
 /** VS Code's token colours, per editor theme. */
 export const EDITOR_COLORS = {
@@ -79,6 +95,9 @@ const prismStyle = (c: (typeof EDITOR_COLORS)[keyof typeof EDITOR_COLORS]) => ({
   number: { color: c.number },
   comment: { color: c.comment, fontStyle: 'normal' },
   variable: { color: c.variable },
+  // Power Query M: `null` and `Text.Type`, and a `#"quoted name"`
+  constant: { color: c.keyword },
+  'quoted-identifier': { color: c.variable },
   operator: { color: c.text },
   punctuation: { color: c.text },
 })
@@ -88,9 +107,14 @@ const STYLES = {
   'light-plus': prismStyle(EDITOR_COLORS['light-plus']),
 }
 
-/** The grammar for a DDL: PL/SQL for Oracle, plain SQL otherwise. */
-export const grammarFor = (dialect: string) =>
-  ['oracle', 'plsql'].includes(dialect.toLowerCase()) ? 'plsql' : 'sql'
+/** The grammar for a code's dialect: PL/SQL for Oracle, DAX, Power Query M, else plain SQL. */
+export const grammarFor = (dialect: string) => {
+  const d = dialect.toLowerCase()
+  if (d === 'oracle' || d === 'plsql') return 'plsql'
+  if (d === 'dax') return 'dax'
+  if (d === 'powerquery') return 'powerquery'
+  return 'sql'
+}
 
 export const editorPre = (t: AxisTokens): CSSProperties => ({
   margin: 0,

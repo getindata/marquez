@@ -3,23 +3,27 @@
 
 import { CopyButton } from './CopyButton'
 import { DdlCode } from './DdlCode'
+import { nativeQueries } from '../powerbi'
 import { platformLabel } from './axisFacets'
 import { useAxisTokens } from '../../../theme'
 import MqCode from '../../../components/core/code/MqCode'
 import React from 'react'
 
 /**
- * A job's code in the job drawer, drawn as the table drawer draws a DDL: Prism SQL or PL/SQL in
- * VS Code Dark+ or Light+, with Copy and the large-DDL guard of `DdlCode`. The standard `sql`
- * facet uses its `dialect` (else SQL); a `sourceCode` facet in a SQL language too. Code in any
- * other language keeps the stock `MqCode`, since only the SQL grammars are bundled here.
+ * A job's code in the job drawer, drawn as the table drawer draws a DDL: Prism SQL, PL/SQL, DAX
+ * or Power Query M in VS Code Dark+ or Light+, with Copy and the large-DDL guard of `DdlCode`.
+ * The standard `sql` facet uses its `dialect` (else SQL); a `sourceCode` facet in one of those
+ * languages too, and each native query (`Query="…"`) of Power Query M follows it as SQL in its
+ * connector's dialect. Code in any other language keeps the stock `MqCode`, since only those
+ * grammars are bundled here.
  */
 
 export interface JobCodeBlock {
-  facet: 'sql' | 'sourceCode'
+  /** The block's key: `sql`, `sourceCode`, or `nativeQuery-<n>` for the M's native queries. */
+  facet: string
   label: string
   text: string
-  /** The `DdlCode` dialect: `oracle` for PL/SQL, else SQL; null for a non-SQL language. */
+  /** The `DdlCode` dialect (`oracle` for PL/SQL, `dax`, `powerquery`); null for another language. */
   dialect: string | null
   language: string
 }
@@ -28,7 +32,16 @@ const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const obj = (v: unknown): Record<string, unknown> =>
   typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {}
 
-const SQL_LANGUAGES: Record<string, string> = { sql: 'sql', plsql: 'oracle', 'pl/sql': 'oracle' }
+/** The `sourceCode` languages `DdlCode` highlights: their dialect, and a label of their own. */
+const LANGUAGES: Record<string, { dialect: string; label?: string }> = {
+  sql: { dialect: 'sql' },
+  plsql: { dialect: 'oracle' },
+  'pl/sql': { dialect: 'oracle' },
+  dax: { dialect: 'dax', label: 'DAX' },
+  powerquery: { dialect: 'powerquery', label: 'Power Query M' },
+  m: { dialect: 'powerquery', label: 'Power Query M' },
+  pq: { dialect: 'powerquery', label: 'Power Query M' },
+}
 
 /**
  * The code blocks of a job's facets: the `sql` query, then the `sourceCode` source. The query
@@ -54,14 +67,27 @@ export const jobCodeBlocks = (facets: unknown): JobCodeBlock[] => {
   const source = obj(f.sourceCode)
   if (str(source.sourceCode).trim()) {
     const language = str(source.language)
-    const dialect = SQL_LANGUAGES[language.toLowerCase()] ?? null
+    const known = LANGUAGES[language.toLowerCase()]
     blocks.push({
       facet: 'sourceCode',
-      label: `Source code${language ? ` · ${language === 'plsql' ? 'PL/SQL' : language}` : ''}`,
+      label:
+        known?.label ??
+        `Source code${language ? ` · ${language === 'plsql' ? 'PL/SQL' : language}` : ''}`,
       text: str(source.sourceCode),
-      dialect,
+      dialect: known?.dialect ?? null,
       language,
     })
+    if (known?.dialect === 'powerquery') {
+      nativeQueries(str(source.sourceCode)).forEach((q, i) =>
+        blocks.push({
+          facet: `nativeQuery-${i}`,
+          label: `Native query · ${q.dialect ? `SQL · ${platformLabel(q.dialect)}` : 'SQL'}`,
+          text: q.sql,
+          dialect: q.dialect || 'sql',
+          language: 'sql',
+        })
+      )
+    }
   }
   return blocks
 }

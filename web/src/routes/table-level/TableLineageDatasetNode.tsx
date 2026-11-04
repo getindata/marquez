@@ -24,14 +24,15 @@ import {
   tailFit,
 } from './cardParts'
 import { IState } from '../../store/reducers'
+import { JobTypeTile, mix } from '../../layers'
 import { LineageDataset } from '../../types/lineage'
+import { POWERBI_TYPE_LABELS, powerBiKindOf } from './powerbi'
 import { PiiDetails } from './PiiDetails'
 import { PositionedNode } from '../../../libs/graph'
 import { TableLineageDatasetNodeData } from './nodes'
 import { connect } from 'react-redux'
 import { datasetDescription, piiColumns, piiLabel, piiRationales } from './columnFacts'
 import { datasetFields } from './layout'
-import { mix } from '../../layers'
 import { selectedRing, useAxisTokens } from '../../theme'
 import { useDrawerLinkState } from './drawer/drawerHistory'
 
@@ -61,8 +62,13 @@ interface TableLineageDatasetNodeProps {
   isMiniMap?: boolean
 }
 
-/** `table`, `view`… from the standard `datasetType` facet, else from Marquez's dataset type. */
+/**
+ * `Power BI table`, `Power BI measures` or `Power BI page` in a `powerbi://` namespace; else
+ * `table`, `view`… from the standard `datasetType` facet, else from Marquez's dataset type.
+ */
 export const datasetTypeOf = (dataset: LineageDataset) => {
+  const powerBi = powerBiKindOf(dataset)
+  if (powerBi) return POWERBI_TYPE_LABELS[powerBi]
   const facet = (dataset.facets as Record<string, any> | undefined)?.datasetType
   const given = typeof facet?.datasetType === 'string' ? facet.datasetType : ''
   if (given) return given.toLowerCase().replace(/_/g, ' ')
@@ -166,6 +172,7 @@ export const TableLineageDatasetNode = ({
     </div>
   )
 
+  const powerBi = powerBiKindOf(lineageDataset) !== null
   const fields = datasetFields(lineageDataset)
   const pii = piiColumns(lineageDataset.facets)
   const rationales = piiRationales(lineageDataset.facets)
@@ -213,6 +220,11 @@ export const TableLineageDatasetNode = ({
             }}
           >
             {wave && <FillAccent color={wave.color} radius='8px 0 0 0' />}
+            {powerBi && (
+              <span data-testid='powerbi-mark' style={{ flex: 'none', width: 18, height: 18 }}>
+                <JobTypeTile glyph='powerbi' size={18} />
+              </span>
+            )}
             {marks.dot && (
               <MQTooltip title={marks.dot.tooltip} placement='top'>
                 <span
@@ -250,7 +262,11 @@ export const TableLineageDatasetNode = ({
                     {tailFit(
                       lineageDataset.name,
                       monoChars(
-                        node.width - 48 - (marks.dot ? 20 : 0) - marks.markers.length * 12,
+                        node.width -
+                          48 -
+                          (powerBi ? 26 : 0) -
+                          (marks.dot ? 20 : 0) -
+                          marks.markers.length * 12,
                         12
                       )
                     )}
