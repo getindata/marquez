@@ -199,24 +199,68 @@ export interface NativeQuery {
   dialect: string
 }
 
+/** The end of the M text literal opening at `start` (its closing quote + 1); `""` is a quote. */
+const literalEnd = (m: string, start: number) => {
+  let i = start + 1
+  while (i < m.length) {
+    if (m[i] !== '"') i += 1
+    else if (m[i + 1] === '"') i += 2
+    else return i + 1
+  }
+  return m.length
+}
+
+const skipSpace = (m: string, at: number) => {
+  let i = at
+  while (i < m.length && /\s/.test(m[i])) i += 1
+  return i
+}
+
+/** The end of the identifier starting at `start`; dots join its parts (`Oracle.Database`). */
+const identifierEnd = (m: string, start: number) => {
+  let i = start + 1
+  while (i < m.length && /[\w.]/.test(m[i])) i += 1
+  return i
+}
+
 /**
  * The native queries of a Power Query M script: each `Query="…"` option, unescaped, with the
- * dialect of the connector call it is in (`Oracle.Database(…)` is Oracle).
+ * dialect of the connector call it is in (`Oracle.Database(…)` is Oracle). The script is read
+ * as M, so a `Query=` in a comment, a text literal or a quoted identifier is not an option.
  */
 export const nativeQueries = (m: string): NativeQuery[] => {
   const found: NativeQuery[] = []
-  const option = /\bQuery\s*=\s*"((?:[^"]|"")*)"/g
-  for (let match = option.exec(m); match; match = option.exec(m)) {
-    const sql = unescapeM(match[1]).trim()
-    if (!sql) continue
-    // the last connector call opened before the option
-    const before = m.slice(0, match.index)
-    const call = /\b([A-Za-z]+)\.[A-Za-z]+\s*\(/g
-    let dialect = ''
-    for (let c = call.exec(before); c; c = call.exec(before)) {
-      dialect = CONNECTORS[c[1].toLowerCase()] ?? dialect
+  let dialect = ''
+  let i = 0
+  while (i < m.length) {
+    if (m.startsWith('//', i)) {
+      const end = m.indexOf('\n', i)
+      i = end === -1 ? m.length : end + 1
+    } else if (m.startsWith('/*', i)) {
+      const end = m.indexOf('*/', i + 2)
+      i = end === -1 ? m.length : end + 2
+    } else if (m[i] === '"' || m.startsWith('#"', i)) {
+      i = literalEnd(m, m[i] === '"' ? i : i + 1)
+    } else if (/[A-Za-z_]/.test(m[i]) && !/[\w.]/.test(m[i - 1] ?? '')) {
+      const end = identifierEnd(m, i)
+      const name = m.slice(i, end)
+      i = end
+      const next = skipSpace(m, i)
+      const dot = name.indexOf('.')
+      if (m[next] === '(' && dot > 0) {
+        // the last connector call before the option
+        dialect = CONNECTORS[name.slice(0, dot).toLowerCase()] ?? dialect
+      } else if (name === 'Query' && m[next] === '=') {
+        const open = skipSpace(m, next + 1)
+        if (m[open] === '"') {
+          i = literalEnd(m, open)
+          const sql = unescapeM(m.slice(open + 1, i - 1)).trim()
+          if (sql) found.push({ sql, dialect })
+        }
+      }
+    } else {
+      i += 1
     }
-    found.push({ sql, dialect })
   }
   return found
 }

@@ -559,4 +559,26 @@ describe('point 4: DAX and Power Query M highlighted', () => {
       )
     ).toEqual([['Source code · PL/SQL', 'oracle']])
   })
+
+  it.each([
+    ['a line comment', '// Query="SELECT 1"\nlet A = 1 in A'],
+    ['a block comment', 'let /* A = Oracle.Database("h", [Query="SELECT 1"]) */ A = 1 in A'],
+    ['another text literal', 'let A = "[Query=""SELECT 1""]" in A'],
+    ['a text literal that ends in Query=', 'let A = "Query=", B = "SELECT 1" in A'],
+    ['a quoted identifier that ends in Query=', 'let #"Query=" = 1, B = "SELECT 1" in B'],
+    ['a quoted identifier', 'let #"Query=""SELECT 1""" = 1 in #"Query=""SELECT 1"""'],
+  ])('reads no native query from inside %s', (_, m) => {
+    expect(nativeQueries(m)).toEqual([])
+  })
+
+  it('still reads a real Query option after comments, keeping comment marks inside its text', () => {
+    const m = `// a note: Query="SELECT 0"
+let
+    /* the roll-up */ Source = Oracle.Database("h", [Query="SELECT '//' AS a /* b */ FROM t"])
+in
+    Source`
+    expect(nativeQueries(m)).toEqual([
+      { sql: "SELECT '//' AS a /* b */ FROM t", dialect: 'oracle' },
+    ])
+  })
 })
