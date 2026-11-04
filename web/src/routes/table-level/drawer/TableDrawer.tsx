@@ -47,7 +47,8 @@ import React, { CSSProperties, ReactNode, useState } from 'react'
  *
  * A Power BI dataset opens the same drawer with the Power BI mark in its header and its own
  * tabs: a model table has Columns, then the Power Query M of the refresh that loads it; the
- * measures have their DAX, then Columns; a page has Page (its wireframe), then Fields.
+ * measures have their DAX, then Columns; a page has Page (its wireframe), then Fields. None
+ * of them has the raw facets tab.
  */
 
 export const DRAWER_WIDTH = 640
@@ -682,7 +683,8 @@ export const TableDrawer = ({ node, lineage, catalog, onClose }: TableDrawerProp
     'columns',
     ...(powerBi === 'table' && writer ? ['m' as Tab] : []),
     'lineage',
-    'facets',
+    // a Power BI dataset reads as its report does, with no raw facet dump (axis#675)
+    ...(powerBi ? [] : ['facets' as Tab]),
   ]
   const [tab, setTab] = useDrawerTab<Tab>(tabs)
   const [view, setView] = useState<DdlView>('source')

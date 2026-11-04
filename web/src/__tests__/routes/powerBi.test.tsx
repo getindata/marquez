@@ -190,7 +190,7 @@ describe('point 1: the Power BI glyph and captions', () => {
 describe('point 2: Power BI nodes open the Axis drawers', () => {
   it('opens a model table on Columns, then Power Query M, with no DDL tab', () => {
     renderTable(IDS.dates)
-    expect(tabNames()).toEqual(['Columns', 'Power Query M', 'Lineage', 'Facets (raw)'])
+    expect(tabNames()).toEqual(['Columns', 'Power Query M', 'Lineage'])
     expect(selectedTab()).toBe('Columns')
     const rows = screen.getAllByTestId('column-row').map((r) => r.textContent)
     expect(rows).toEqual(['DAYdateTime', 'Monthstring', 'Quarterstring'])
@@ -212,7 +212,7 @@ describe('point 2: Power BI nodes open the Axis drawers', () => {
 
   it('opens the measures on DAX, then Columns', () => {
     renderTable(IDS.measures)
-    expect(tabNames()).toEqual(['DAX', 'Columns', 'Lineage', 'Facets (raw)'])
+    expect(tabNames()).toEqual(['DAX', 'Columns', 'Lineage'])
     expect(selectedTab()).toBe('DAX')
     expect(screen.getByTestId('writer-job').textContent).toBe('shop-report.measures')
     expect(screen.getByTestId('job-code-sourceCode').textContent).toContain(
@@ -222,7 +222,7 @@ describe('point 2: Power BI nodes open the Axis drawers', () => {
 
   it('opens a page on Page, then Fields and Lineage', () => {
     renderTable(IDS.page)
-    expect(tabNames()).toEqual(['Page', 'Fields', 'Lineage', 'Facets (raw)'])
+    expect(tabNames()).toEqual(['Page', 'Fields', 'Lineage'])
     expect(selectedTab()).toBe('Page')
     fireEvent.click(screen.getByRole('tab', { name: 'Fields' }))
     expect(screen.getAllByTestId('column-row')).toHaveLength(7)
@@ -232,11 +232,21 @@ describe('point 2: Power BI nodes open the Axis drawers', () => {
     ).toBe('shop-report: Overview.render')
   })
 
+  it('has no raw facet dump on a Power BI dataset, while an Oracle table keeps its Facets tab', () => {
+    ;[IDS.dates, IDS.measures, IDS.page].forEach((id) => {
+      const { unmount } = renderTable(id)
+      expect(screen.queryByRole('tab', { name: 'Facets (raw)' })).toBeNull()
+      unmount()
+    })
+    renderTable(IDS.oracle)
+    expect(tabNames()).toEqual(['Columns', 'Lineage', 'Facets (raw)'])
+  })
+
   it('leaves the M tab out when the graph does not hold the table’s refresh', () => {
     const lineage = powerBiGraph()
     lineage.graph = lineage.graph.filter((n) => n.id !== IDS.datesRefresh)
     renderTable(IDS.dates, 'xebia', lineage)
-    expect(tabNames()).toEqual(['Columns', 'Lineage', 'Facets (raw)'])
+    expect(tabNames()).toEqual(['Columns', 'Lineage'])
   })
 
   const host = (selected: string) => {
