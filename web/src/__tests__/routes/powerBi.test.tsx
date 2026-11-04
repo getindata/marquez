@@ -539,7 +539,7 @@ describe('point 4: DAX and Power Query M highlighted', () => {
   it('reads each native query with its connector’s dialect', () => {
     expect(
       nativeQueries(
-        'let A = Sql.Database("h", "db", [Query="SELECT 1"]), B = Value.Type(A), C = Snowflake.Databases("x"){[Query="SELECT 2"]} in A'
+        'let A = Sql.Database("h", "db", [Query="SELECT 1"]), B = Value.Type(A), C = Snowflake.Databases("x", "wh", [Query="SELECT 2"]) in A'
       )
     ).toEqual([
       { sql: 'SELECT 1', dialect: 'sqlserver' },
@@ -569,6 +569,30 @@ describe('point 4: DAX and Power Query M highlighted', () => {
     ['a quoted identifier', 'let #"Query=""SELECT 1""" = 1 in #"Query=""SELECT 1"""'],
   ])('reads no native query from inside %s', (_, m) => {
     expect(nativeQueries(m)).toEqual([])
+  })
+
+  it('gives a query under an unknown connector no dialect, even after a known one', () => {
+    expect(
+      nativeQueries(
+        'let A = Oracle.Database("h", [Query="SELECT 1"]), B = Exasol.Database("h", [Query="SELECT 2"]) in B'
+      )
+    ).toEqual([
+      { sql: 'SELECT 1', dialect: 'oracle' },
+      { sql: 'SELECT 2', dialect: '' },
+    ])
+  })
+
+  it('takes the dialect from the call the option is in, not from a call closed before it', () => {
+    expect(
+      nativeQueries(
+        'let A = Oracle.Database("h"), B = Odbc.DataSource("dsn", [Query="SELECT 1"]) in B'
+      )
+    ).toEqual([{ sql: 'SELECT 1', dialect: '' }])
+    expect(
+      nativeQueries(
+        'let A = Oracle.Database("h", [HierarchicalNavigation=true, Timeout=#duration(0, 0, 5, 0), Query="SELECT 1"]) in A'
+      )
+    ).toEqual([{ sql: 'SELECT 1', dialect: 'oracle' }])
   })
 
   it('still reads a real Query option after comments, keeping comment marks inside its text', () => {
