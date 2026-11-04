@@ -15,7 +15,8 @@ import React, { CSSProperties, ReactNode, useState } from 'react'
 /**
  * A Power BI page drawn as its report: each visual a box at its position, scaled to the
  * drawer's width with the page's aspect ratio, in `z` order, with its type glyph, title and
- * fields as chips. Visuals with no position are listed under the page, then the page's fields.
+ * fields as chips. Visuals with no position, or one outside the page, are listed under it, as
+ * are all of them on a page with no usable size; then the page's fields.
  * Hovering a chip or a field highlights that field everywhere on the tab. The wireframe shows
  * structure, not data.
  */
@@ -217,8 +218,10 @@ export const PageTab = ({ page, fields }: { page: PowerBiPage; fields: string[] 
             })}
           </div>
         ) : (
-          <div style={{ color: t.muted, fontSize: 12.5 }}>
-            The report layout gives no positions for this page’s visuals.
+          <div data-testid='no-wireframe' style={{ color: t.muted, fontSize: 12.5 }}>
+            {width && height
+              ? 'The report layout places none of this page’s visuals on it.'
+              : 'The report layout gives this page no usable size, so it is not drawn.'}
           </div>
         )}
       </section>

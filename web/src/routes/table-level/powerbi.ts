@@ -59,47 +59,58 @@ export interface PowerBiVisual {
 }
 
 export interface PowerBiPage {
-  /** The page's size: the facet's, else the extent of its placed visuals; null when neither. */
+  /** The page's size; null when the facet gives none, or one out of range (see `MAX_PAGE_SIZE`). */
   width: number | null
   height: number | null
   visuals: PowerBiVisual[]
 }
 
-const positionOf = (v: Record<string, unknown>): VisualPosition | null => {
+/** A page side over this many px is not a report page: its layout is not drawn. */
+export const MAX_PAGE_SIZE = 10_000
+
+/** How far past the page's edge a visual may reach and still be drawn: layouts round to 1 px. */
+const FIT_SLACK = 1
+
+const pageSide = (v: unknown) => {
+  const n = num(v)
+  return n !== null && n > 0 && n <= MAX_PAGE_SIZE ? n : null
+}
+
+/**
+ * A visual's position when it lies inside the page: no negative offset, a positive size, and
+ * no edge past the page's. Null otherwise, and on a page with no usable size: such a visual is
+ * listed under the page, not drawn on it.
+ */
+const positionOf = (
+  v: Record<string, unknown>,
+  page: { width: number | null; height: number | null }
+): VisualPosition | null => {
   const [x, y, width, height] = [num(v.x), num(v.y), num(v.width), num(v.height)]
   if (x === null || y === null || width === null || height === null) return null
-  if (width <= 0 || height <= 0) return null
+  if (page.width === null || page.height === null) return null
+  if (x < 0 || y < 0 || width <= 0 || height <= 0) return null
+  if (x + width > page.width + FIT_SLACK || y + height > page.height + FIT_SLACK) return null
   return { x, y, width, height, z: num(v.z) ?? 0 }
 }
 
 /**
  * The page of an `axisPowerBiPage` facet: `width`, `height` and each visual's `type`, `title`,
- * `fields`, and `x`, `y`, `width`, `height`, `z` when it has a position. Null for a missing or
- * malformed facet.
+ * `fields`, and `x`, `y`, `width`, `height`, `z` when it has a position inside the page. Null
+ * for a missing or malformed facet.
  */
 export const readPowerBiPage = (facets: unknown): PowerBiPage | null => {
   const f = isObject(facets) ? facets.axisPowerBiPage : null
   if (!isObject(f)) return null
+  const size = { width: pageSide(f.width), height: pageSide(f.height) }
   const visuals = (Array.isArray(f.visuals) ? f.visuals : []).filter(isObject).map(
     (v): PowerBiVisual => ({
       type: str(v.type),
       title: str(v.title),
       fields: (Array.isArray(v.fields) ? v.fields : []).map(str).filter(Boolean),
-      position: positionOf(v),
+      position: positionOf(v, size),
     })
   )
-  const placed = visuals.flatMap((v) => (v.position ? [v.position] : []))
-  const given = (v: unknown) => {
-    const n = num(v)
-    return n !== null && n > 0 ? n : null
-  }
-  const extent = (side: (p: VisualPosition) => number) =>
-    placed.length ? Math.max(...placed.map(side)) : null
-  return {
-    width: given(f.width) ?? extent((p) => p.x + p.width),
-    height: given(f.height) ?? extent((p) => p.y + p.height),
-    visuals,
-  }
+  return { ...size, visuals }
 }
 
 export type VisualGlyph = 'card' | 'table' | 'line' | 'column' | 'pie' | 'slicer' | 'generic'

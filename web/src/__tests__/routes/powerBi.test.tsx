@@ -380,6 +380,8 @@ describe('point 3: the Page tab', () => {
     expect(readPowerBiPage({ axisPowerBiPage: 'x' })).toBeNull()
     const page = readPowerBiPage({
       axisPowerBiPage: {
+        width: 1280,
+        height: 720,
         visuals: [
           null,
           { type: 'card', x: 10, y: 10, width: 100, height: 0 },
@@ -389,8 +391,6 @@ describe('point 3: the Page tab', () => {
     })
     expect(page?.visuals.map((v) => !!v.position)).toEqual([false, true])
     expect(page?.visuals[1].fields).toEqual(['T.a'])
-    // no page size: the extent of the placed visuals
-    expect([page?.width, page?.height]).toEqual([200, 100])
   })
 
   it.each(['xebia', 'dark', 'light'] as const)(
@@ -403,6 +403,67 @@ describe('point 3: the Page tab', () => {
       )
     }
   )
+})
+
+describe('out-of-range page geometry', () => {
+  const withVisual = (visual: object, size: object = { width: 1280, height: 720 }) => ({
+    ...PAGE_FACET,
+    ...size,
+    visuals: [
+      ...PAGE_FACET.visuals,
+      { type: 'card', title: 'Odd', fields: ['Orders.Revenue'], ...visual },
+    ],
+  })
+  const placedTitles = () =>
+    screen
+      .getAllByTestId('page-visual')
+      .map((b) => within(b).getByTestId('visual-title').textContent)
+  const unplacedTitles = () =>
+    screen
+      .queryAllByTestId('unplaced-visual')
+      .map((v) => within(v).getByTestId('visual-title').textContent)
+
+  it.each([
+    ['at a negative x', { x: -40, y: 20, width: 100, height: 100 }],
+    ['at a negative y', { x: 20, y: -20, width: 100, height: 100 }],
+    ['past the right edge', { x: 1200, y: 20, width: 100, height: 100 }],
+    ['past the bottom edge', { x: 20, y: 700, width: 100, height: 100 }],
+    ['larger than the page', { x: 0, y: 0, width: 2000, height: 10000 }],
+  ])('lists a visual %s under the page instead of drawing it', (_, geometry) => {
+    renderTable(IDS.page, 'xebia', powerBiGraph(withVisual(geometry)))
+    expect(placedTitles()).toHaveLength(7)
+    expect(placedTitles()).not.toContain('Odd')
+    expect(unplacedTitles()).toEqual(['Odd'])
+  })
+
+  it('draws a visual that fills the page exactly', () => {
+    renderTable(
+      IDS.page,
+      'xebia',
+      powerBiGraph(withVisual({ x: 0, y: 0, width: 1280, height: 720 }))
+    )
+    expect(placedTitles()).toContain('Odd')
+  })
+
+  it.each([
+    ['no size', { width: undefined, height: undefined }],
+    ['no height', { height: undefined }],
+    ['a zero width', { width: 0 }],
+    ['a negative height', { height: -720 }],
+    ['an absurd width', { width: 20000 }],
+    ['an absurd height', { height: 10001 }],
+    ['a size that is not a number', { width: '1280' }],
+  ])('draws no wireframe for a page with %s, and lists all its visuals', (_, size) => {
+    renderTable(IDS.page, 'xebia', powerBiGraph({ ...PAGE_FACET, ...size }))
+    expect(screen.queryByTestId('page-wireframe')).toBeNull()
+    expect(unplacedTitles()).toHaveLength(7)
+  })
+
+  it('reads a page with no usable size as having none, and none of its visuals placed', () => {
+    const page = readPowerBiPage({ axisPowerBiPage: { ...PAGE_FACET, width: 20000 } })
+    expect([page?.width, page?.height]).toEqual([null, 720])
+    expect(page?.visuals.every((v) => v.position === null)).toBe(true)
+  })
 })
 
 describe('point 4: DAX and Power Query M highlighted', () => {
