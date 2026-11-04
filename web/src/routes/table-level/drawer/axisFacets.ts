@@ -196,6 +196,9 @@ const VENDORS: Record<string, string> = {
   bigquery: 'BigQuery',
   postgres: 'PostgreSQL',
   postgresql: 'PostgreSQL',
+  sqlserver: 'SQL Server',
+  mysql: 'MySQL',
+  redshift: 'Redshift',
 }
 
 /** `oracle` → `Oracle`; an unknown platform keeps its name with a capital. */

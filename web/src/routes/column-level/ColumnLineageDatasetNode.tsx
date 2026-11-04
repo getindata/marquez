@@ -1,7 +1,9 @@
 import { ColumnLineageDatasetNodeData } from './nodes'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { JobTypeTile } from '../../layers'
 import { PositionedNode } from '../../../libs/graph'
 import { faDatabase } from '@fortawesome/free-solid-svg-icons'
+import { isPowerBiNamespace } from '../table-level/powerbi'
 import { truncateText } from '../../helpers/text'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
@@ -62,14 +64,20 @@ export const ColumnLineageDatasetNode = ({ node }: ColumnLineageDatasetNodeProps
       >
         {`${truncateText(node.data.dataset, 25)}`}
       </text>
-      <FontAwesomeIcon
-        x={node.width - 24}
-        y={12}
-        width={16}
-        height={16}
-        color={theme.palette.primary.main}
-        icon={faDatabase}
-      />
+      {isPowerBiNamespace(node.data.namespace) ? (
+        <g transform={`translate(${node.width - 26} 11)`} data-testid='powerbi-mark'>
+          <JobTypeTile glyph='powerbi' size={18} />
+        </g>
+      ) : (
+        <FontAwesomeIcon
+          x={node.width - 24}
+          y={12}
+          width={16}
+          height={16}
+          color={theme.palette.primary.main}
+          icon={faDatabase}
+        />
+      )}
     </>
   )
 }
